@@ -84,6 +84,10 @@ pub enum Commands {
     Dirty,
     /// List discovered projects
     ListProjects,
+    /// Show the age of the last commit per repo
+    Age,
+    /// Show unique commit authors per repo
+    Authors,
 
     // ── do_for_all_projects ──
     /// Branch operations
@@ -98,22 +102,57 @@ pub enum Commands {
         #[arg(long, default_value_t = false)]
         quiet: bool,
     },
+    /// Push all repositories
+    Push,
+    /// Fetch from origin for all repositories
+    Fetch,
     /// Clean repositories
     Clean {
         /// What kind of clean to perform
         #[arg(value_enum)]
         what: CleanWhat,
     },
-    /// Fetch from origin for all repositories
-    Fetch,
     /// Stash operations
     Stash {
         /// What stash operation to perform
         #[arg(value_enum)]
         what: StashWhat,
     },
+    /// Reset operations
+    Reset {
+        /// What kind of reset to perform
+        #[arg(value_enum)]
+        what: ResetWhat,
+    },
     /// Show diff for all repositories
     Diff,
+    /// Show recent commits
+    Log {
+        /// Number of commits to show
+        #[arg(long, default_value_t = 10)]
+        count: u32,
+    },
+    /// List tags
+    Tag,
+    /// Show remote URLs
+    Remote,
+    /// Prune stale remote-tracking branches
+    Prune,
+    /// Run git garbage collection
+    Gc,
+    /// Checkout a branch across all repositories
+    Checkout {
+        /// Branch name to checkout
+        branch: String,
+    },
+    /// Commit all changes across all repositories
+    Commit {
+        /// Commit message
+        #[arg(short, long)]
+        message: String,
+    },
+    /// Update submodules recursively
+    SubmoduleUpdate,
     /// Grep across all repositories
     Grep {
         /// Regular expression to search for
@@ -185,6 +224,16 @@ pub enum StashWhat {
 }
 
 #[derive(Clone, ValueEnum)]
+pub enum ResetWhat {
+    /// Hard reset: discard all changes (git reset --hard HEAD)
+    Hard,
+    /// Soft reset: keep changes staged (git reset --soft HEAD)
+    Soft,
+    /// Mixed reset: unstage changes (git reset --mixed HEAD)
+    Mixed,
+}
+
+#[derive(Clone, ValueEnum)]
 pub enum BuildWhat {
     /// Run bootstrap across all projects
     Bootstrap,
@@ -228,9 +277,17 @@ mod tests {
             "status",
             "dirty",
             "list-projects",
+            "age",
+            "authors",
             "pull",
+            "push",
             "fetch",
             "diff",
+            "tag",
+            "remote",
+            "prune",
+            "gc",
+            "submodule-update",
             "version",
         ];
         for sub in subcommands {
@@ -258,6 +315,27 @@ mod tests {
             let result = Cli::try_parse_from(["rmg", "branch", what]);
             assert!(result.is_ok(), "branch {what} should parse");
         }
+
+        // reset requires a what argument
+        let reset_whats = ["hard", "soft", "mixed"];
+        for what in reset_whats {
+            let result = Cli::try_parse_from(["rmg", "reset", what]);
+            assert!(result.is_ok(), "reset {what} should parse");
+        }
+
+        // log accepts optional --count
+        let result = Cli::try_parse_from(["rmg", "log"]);
+        assert!(result.is_ok(), "log should parse without args");
+        let result = Cli::try_parse_from(["rmg", "log", "--count", "5"]);
+        assert!(result.is_ok(), "log --count 5 should parse");
+
+        // checkout requires a branch
+        let result = Cli::try_parse_from(["rmg", "checkout", "main"]);
+        assert!(result.is_ok(), "checkout main should parse");
+
+        // commit requires -m
+        let result = Cli::try_parse_from(["rmg", "commit", "-m", "test"]);
+        assert!(result.is_ok(), "commit -m test should parse");
 
         // stash requires a what argument
         let stash_whats = ["push", "pop"];

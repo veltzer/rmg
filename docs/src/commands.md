@@ -89,6 +89,22 @@ List all discovered projects.
 rmg list-projects
 ```
 
+### `rmg age`
+
+Show the age of the last commit for each repo as a human-readable relative date.
+
+```bash
+rmg age
+```
+
+### `rmg authors`
+
+Show unique commit authors for each repo, sorted by number of commits.
+
+```bash
+rmg authors
+```
+
 ## Action Commands
 
 These commands run an action in each project directory.
@@ -126,6 +142,14 @@ rmg pull
 rmg pull --quiet
 ```
 
+### `rmg push`
+
+Push the current branch to origin.
+
+```bash
+rmg push
+```
+
 ### `rmg fetch`
 
 Fetch from origin without merging.
@@ -148,6 +172,82 @@ Pop the most recent stash in each repo.
 
 ```bash
 rmg stash pop
+```
+
+### `rmg reset hard|soft|mixed`
+
+Reset HEAD across all repos.
+
+```bash
+rmg reset hard       # Discard all changes
+rmg reset soft       # Keep changes staged
+rmg reset mixed      # Unstage changes (default git behavior)
+```
+
+### `rmg log`
+
+Show recent commits for each repo.
+
+```bash
+rmg log              # Show last 10 commits
+rmg log -n 5         # Show last 5 commits
+```
+
+### `rmg tag`
+
+List tags for each repo.
+
+```bash
+rmg tag
+```
+
+### `rmg remote`
+
+Show remote URLs for each repo.
+
+```bash
+rmg remote
+```
+
+### `rmg prune`
+
+Prune stale remote-tracking branches (`git remote prune origin`).
+
+```bash
+rmg prune
+```
+
+### `rmg gc`
+
+Run git garbage collection on each repo.
+
+```bash
+rmg gc
+```
+
+### `rmg checkout <BRANCH>`
+
+Checkout a branch across all repos.
+
+```bash
+rmg checkout main
+rmg checkout develop
+```
+
+### `rmg commit -m <MESSAGE>`
+
+Stage all changes and commit across all repos with a shared message.
+
+```bash
+rmg commit -m "bump version"
+```
+
+### `rmg submodule-update`
+
+Update submodules recursively (`git submodule update --init --recursive`).
+
+```bash
+rmg submodule-update
 ```
 
 ### `rmg clean-hard`

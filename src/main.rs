@@ -10,7 +10,7 @@ use std::path::Path;
 use anyhow::Result;
 use clap::Parser;
 
-use cli::{BranchWhat, BuildWhat, Cli, CleanWhat, Commands, CountWhat, StashWhat};
+use cli::{BranchWhat, BuildWhat, Cli, CleanWhat, Commands, CountWhat, ResetWhat, StashWhat};
 use config::AppConfig;
 
 fn main() -> Result<()> {
@@ -62,6 +62,12 @@ fn main() -> Result<()> {
                 Ok(Some(project.display().to_string()))
             })?;
         }
+        Commands::Age => {
+            runner::print_if_data(&config, &projects, commands::age::do_age)?;
+        }
+        Commands::Authors => {
+            runner::print_if_data(&config, &projects, commands::authors::do_authors)?;
+        }
 
         // ── do_for_all_projects ──
         Commands::Branch { what } => {
@@ -78,6 +84,12 @@ fn main() -> Result<()> {
                 commands::pull::do_pull(project, quiet)
             })?;
         }
+        Commands::Push => {
+            runner::do_for_all_projects(&config, &projects, commands::push::do_push)?;
+        }
+        Commands::Fetch => {
+            runner::do_for_all_projects(&config, &projects, commands::fetch::do_fetch)?;
+        }
         Commands::Clean { what } => {
             let clean_fn: fn(&Path) -> anyhow::Result<bool> = match what {
                 CleanWhat::Hard => commands::clean::clean_hard,
@@ -88,9 +100,6 @@ fn main() -> Result<()> {
             };
             runner::do_for_all_projects(&config, &projects, clean_fn)?;
         }
-        Commands::Fetch => {
-            runner::do_for_all_projects(&config, &projects, commands::fetch::do_fetch)?;
-        }
         Commands::Stash { what } => {
             let stash_fn: fn(&Path) -> anyhow::Result<bool> = match what {
                 StashWhat::Push => commands::stash::stash_push,
@@ -98,8 +107,49 @@ fn main() -> Result<()> {
             };
             runner::do_for_all_projects(&config, &projects, stash_fn)?;
         }
+        Commands::Reset { what } => {
+            let reset_fn: fn(&Path) -> anyhow::Result<bool> = match what {
+                ResetWhat::Hard => commands::reset::reset_hard,
+                ResetWhat::Soft => commands::reset::reset_soft,
+                ResetWhat::Mixed => commands::reset::reset_mixed,
+            };
+            runner::do_for_all_projects(&config, &projects, reset_fn)?;
+        }
         Commands::Diff => {
             runner::do_for_all_projects(&config, &projects, commands::diff::do_diff)?;
+        }
+        Commands::Log { count } => {
+            let count = *count;
+            runner::do_for_all_projects(&config, &projects, move |project: &Path| -> anyhow::Result<bool> {
+                commands::log::do_log(project, count)
+            })?;
+        }
+        Commands::Tag => {
+            runner::do_for_all_projects(&config, &projects, commands::tag::do_tag)?;
+        }
+        Commands::Remote => {
+            runner::do_for_all_projects(&config, &projects, commands::remote::do_remote)?;
+        }
+        Commands::Prune => {
+            runner::do_for_all_projects(&config, &projects, commands::prune::do_prune)?;
+        }
+        Commands::Gc => {
+            runner::do_for_all_projects(&config, &projects, commands::gc::do_gc)?;
+        }
+        Commands::Checkout { branch } => {
+            let branch = branch.clone();
+            runner::do_for_all_projects(&config, &projects, move |project: &Path| -> anyhow::Result<bool> {
+                commands::checkout::do_checkout(project, &branch)
+            })?;
+        }
+        Commands::Commit { message } => {
+            let message = message.clone();
+            runner::do_for_all_projects(&config, &projects, move |project: &Path| -> anyhow::Result<bool> {
+                commands::commit::do_commit(project, &message)
+            })?;
+        }
+        Commands::SubmoduleUpdate => {
+            runner::do_for_all_projects(&config, &projects, commands::submodule::submodule_update)?;
         }
         Commands::Grep { regexp, files } => {
             let regexp = regexp.clone();

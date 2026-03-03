@@ -94,15 +94,27 @@ rmg complete bash >> ~/.bash_completion
 | `status` | Show status of repositories |
 | `dirty` | Show dirty repositories |
 | `list-projects` | List discovered projects |
+| `age` | Show the age of the last commit per repo |
+| `authors` | Show unique commit authors per repo |
 
 ### Operations
 | Command | Description |
 |---------|-------------|
 | `pull` | Pull all repositories |
+| `push` | Push all repositories |
 | `fetch` | Fetch from origin for all repositories |
 | `stash push` | Stash working-tree changes |
 | `stash pop` | Pop the most recent stash |
+| `reset hard/soft/mixed` | Reset HEAD across all repositories |
 | `diff` | Show diff for all repositories |
+| `log` | Show recent commits (default 10) |
+| `tag` | List tags |
+| `remote` | Show remote URLs |
+| `prune` | Prune stale remote-tracking branches |
+| `gc` | Run git garbage collection |
+| `checkout <branch>` | Checkout a branch across all repositories |
+| `commit -m <msg>` | Commit all changes with a shared message |
+| `submodule-update` | Update submodules recursively |
 | `grep <regexp>` | Grep across all repositories |
 | `clean hard` | Hard-clean all repositories (`git clean -ffxd`) |
 | `clean soft` | Remove untracked files only (`git clean -fd`) |
