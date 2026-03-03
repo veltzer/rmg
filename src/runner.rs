@@ -127,7 +127,7 @@ where
                 }
             }
             Ok(None) => {
-                if config.print_not {
+                if config.print_not || config.verbose {
                     print_project_header(project);
                 }
             }
