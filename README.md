@@ -1,4 +1,4 @@
-# rmg - Repo Multi Git
+# rmg - Rust Multi Git
 
 A fast CLI tool for managing multiple git repositories at once. Run status checks, builds, pulls, greps, and more across all your repos in a single command.
 
