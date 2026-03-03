@@ -1,0 +1,14 @@
+[book]
+authors = ["veltzer"]
+language = "en"
+src = "src"
+title = "RMG - Rust Multi-Git"
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/veltzer/rmg"
+edit-url-template = "https://github.com/veltzer/rmg/edit/master/docs/{path}"
