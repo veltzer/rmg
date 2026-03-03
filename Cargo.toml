@@ -1,0 +1,16 @@
+[package]
+name = "rmg"
+version = "0.1.0"
+edition = "2021"
+authors = ["Mark Veltzer <mark.veltzer@gmail.com>"]
+description = "Manage multiple git repositories at once"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+git2 = "0.20"
+glob = "0.3"
+anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"
+serial_test = "3"
