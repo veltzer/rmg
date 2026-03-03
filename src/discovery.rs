@@ -24,12 +24,22 @@ pub fn discover_projects(config: &AppConfig) -> Result<Vec<PathBuf>> {
             .filter(|p| p.is_dir() && p.join(".git").is_dir())
             .collect()
     } else {
-        // Glob-based discovery
-        glob::glob(&config.glob)
+        // Glob-based discovery: try the configured pattern, and if that
+        // yields nothing also try "*" so rmg works when immediate
+        // subdirectories are already git repos.
+        let mut found: Vec<PathBuf> = glob::glob(&config.glob)
             .context("invalid glob pattern")?
             .filter_map(|e| e.ok())
             .filter(|p| p.is_dir() && p.join(".git").is_dir())
-            .collect()
+            .collect();
+        if found.is_empty() && config.glob == "*/*" {
+            found = glob::glob("*")
+                .context("invalid glob pattern")?
+                .filter_map(|e| e.ok())
+                .filter(|p| p.is_dir() && p.join(".git").is_dir())
+                .collect();
+        }
+        found
     };
 
     if !config.no_sort {
