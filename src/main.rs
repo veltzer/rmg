@@ -10,7 +10,7 @@ use std::path::Path;
 use anyhow::Result;
 use clap::Parser;
 
-use cli::{Cli, Commands, CountWhat};
+use cli::{Cli, CleanWhat, Commands, CountWhat};
 use config::AppConfig;
 
 fn main() -> Result<()> {
@@ -86,8 +86,15 @@ fn main() -> Result<()> {
                 commands::pull::do_pull(project, quiet)
             })?;
         }
-        Commands::CleanHard => {
-            runner::do_for_all_projects(&config, &projects, commands::clean::do_clean)?;
+        Commands::Clean { what } => {
+            let clean_fn: fn(&Path) -> anyhow::Result<bool> = match what {
+                CleanWhat::Hard => commands::clean::clean_hard,
+                CleanWhat::Soft => commands::clean::clean_soft,
+                CleanWhat::Make => commands::clean::clean_make,
+                CleanWhat::Git => commands::clean::clean_git,
+                CleanWhat::Cargo => commands::clean::clean_cargo,
+            };
+            runner::do_for_all_projects(&config, &projects, clean_fn)?;
         }
         Commands::Diff => {
             runner::do_for_all_projects(&config, &projects, commands::diff::do_diff)?;

@@ -100,8 +100,12 @@ pub enum Commands {
         #[arg(long, default_value_t = false)]
         quiet: bool,
     },
-    /// Hard-clean all repositories (git clean -ffxd)
-    CleanHard,
+    /// Clean repositories
+    Clean {
+        /// What kind of clean to perform
+        #[arg(value_enum)]
+        what: CleanWhat,
+    },
     /// Show diff for all repositories
     Diff,
     /// Grep across all repositories
@@ -138,6 +142,20 @@ pub enum Commands {
 
     /// Print version information
     Version,
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum CleanWhat {
+    /// Hard-clean: remove all untracked and ignored files (git clean -ffxd)
+    Hard,
+    /// Soft-clean: remove untracked files only (git clean -fd)
+    Soft,
+    /// Run make clean
+    Make,
+    /// Discard unstaged working-tree changes (git checkout .)
+    Git,
+    /// Run cargo clean (skip if no Cargo.toml)
+    Cargo,
 }
 
 #[derive(Clone, ValueEnum)]
@@ -181,7 +199,6 @@ mod tests {
             "branch-remote",
             "branch-github",
             "pull",
-            "clean-hard",
             "diff",
             "build-bootstrap",
             "build-pydmt",
@@ -195,6 +212,13 @@ mod tests {
         for sub in subcommands {
             let result = Cli::try_parse_from(["rmg", sub]);
             assert!(result.is_ok(), "subcommand {sub} should parse");
+        }
+
+        // clean requires a what argument
+        let clean_whats = ["hard", "soft", "make", "git", "cargo"];
+        for what in clean_whats {
+            let result = Cli::try_parse_from(["rmg", "clean", what]);
+            assert!(result.is_ok(), "clean {what} should parse");
         }
 
         // count requires a what argument

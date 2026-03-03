@@ -102,7 +102,11 @@ rmg complete bash >> ~/.bash_completion
 | `pull` | Pull all repositories |
 | `diff` | Show diff for all repositories |
 | `grep <regexp>` | Grep across all repositories |
-| `clean-hard` | Hard-clean all repositories (`git clean -ffxd`) |
+| `clean hard` | Hard-clean all repositories (`git clean -ffxd`) |
+| `clean soft` | Remove untracked files only (`git clean -fd`) |
+| `clean make` | Run `make clean` |
+| `clean git` | Discard unstaged working-tree changes (`git checkout .`) |
+| `clean cargo` | Run `cargo clean` (skip if no `Cargo.toml`) |
 | `branch-local` | Show local branches |
 | `branch-remote` | Show remote branches |
 | `branch-github` | Show GitHub default branch |
