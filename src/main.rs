@@ -10,7 +10,7 @@ use std::path::Path;
 use anyhow::Result;
 use clap::Parser;
 
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, CountWhat};
 use config::AppConfig;
 
 fn main() -> Result<()> {
@@ -41,14 +41,13 @@ fn main() -> Result<()> {
 
     match &cli.command {
         // ── do_count ──
-        Commands::CountDirty => {
-            runner::do_count(&config, &projects, commands::count::is_dirty)?;
-        }
-        Commands::Untracked => {
-            runner::do_count(&config, &projects, commands::count::has_untracked)?;
-        }
-        Commands::Synchronized => {
-            runner::do_count(&config, &projects, commands::count::non_synchronized)?;
+        Commands::Count { what } => {
+            let test_fn: fn(&Path) -> anyhow::Result<bool> = match what {
+                CountWhat::Dirty => commands::count::is_dirty,
+                CountWhat::Untracked => commands::count::has_untracked,
+                CountWhat::Synchronized => commands::count::non_synchronized,
+            };
+            runner::do_count(&config, &projects, test_fn)?;
         }
 
         // ── print_if_data ──

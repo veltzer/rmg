@@ -66,7 +66,7 @@ rmg dirty
 rmg pull
 
 # Count dirty repos with stats
-rmg --stats count-dirty
+rmg --stats count dirty
 
 # Grep across all repos
 rmg grep "TODO"
@@ -89,9 +89,9 @@ rmg complete bash >> ~/.bash_completion
 ### Inspection
 | Command | Description |
 |---------|-------------|
-| `count-dirty` | Count dirty repositories |
-| `untracked` | Count repositories with untracked files |
-| `synchronized` | Count non-synchronized repositories (ahead/behind remote) |
+| `count dirty` | Count dirty repositories |
+| `count untracked` | Count repositories with untracked files |
+| `count synchronized` | Count non-synchronized repositories (ahead/behind remote) |
 | `status` | Show status of repositories |
 | `dirty` | Show dirty repositories |
 | `list-projects` | List discovered projects |

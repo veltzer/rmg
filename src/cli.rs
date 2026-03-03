@@ -1,6 +1,6 @@
 use std::io;
 
-use clap::{CommandFactory, Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
 use clap_complete::{generate, Shell};
 
 #[derive(Parser)]
@@ -70,12 +70,12 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     // ── do_count ──
-    /// Count dirty repositories
-    CountDirty,
-    /// Count repositories with untracked files
-    Untracked,
-    /// Count non-synchronized repositories (ahead/behind remote)
-    Synchronized,
+    /// Count repositories matching a condition
+    Count {
+        /// What to count
+        #[arg(value_enum)]
+        what: CountWhat,
+    },
 
     // ── print_projects_that_return_data ──
     /// Show status of repositories
@@ -140,6 +140,16 @@ pub enum Commands {
     Version,
 }
 
+#[derive(Clone, ValueEnum)]
+pub enum CountWhat {
+    /// Count dirty repositories
+    Dirty,
+    /// Count repositories with untracked files
+    Untracked,
+    /// Count non-synchronized repositories (ahead/behind remote)
+    Synchronized,
+}
+
 /// Generate shell completions and print to stdout.
 pub fn print_completions(shell: Shell) {
     let mut cmd = Cli::command();
@@ -156,16 +166,13 @@ mod tests {
 
     #[test]
     fn parse_count_dirty() {
-        let cli = parse(&["rmg", "count-dirty"]);
-        assert!(matches!(cli.command, Commands::CountDirty));
+        let cli = parse(&["rmg", "count", "dirty"]);
+        assert!(matches!(cli.command, Commands::Count { what: CountWhat::Dirty }));
     }
 
     #[test]
     fn parse_all_subcommands() {
         let subcommands = [
-            "count-dirty",
-            "untracked",
-            "synchronized",
             "status",
             "dirty",
             "check-workflow-exists-for-makefile",
@@ -188,6 +195,13 @@ mod tests {
         for sub in subcommands {
             let result = Cli::try_parse_from(["rmg", sub]);
             assert!(result.is_ok(), "subcommand {sub} should parse");
+        }
+
+        // count requires a what argument
+        let count_whats = ["dirty", "untracked", "synchronized"];
+        for what in count_whats {
+            let result = Cli::try_parse_from(["rmg", "count", what]);
+            assert!(result.is_ok(), "count {what} should parse");
         }
 
         // complete requires an argument
@@ -247,7 +261,7 @@ mod tests {
         let cli = parse(&[
             "rmg", "--terse", "--stats", "--no-output", "--verbose", "--print-not",
             "--no-sort", "--no-stop", "--no-print-no-projects",
-            "count-dirty",
+            "count", "dirty",
         ]);
         assert!(cli.terse);
         assert!(cli.stats);

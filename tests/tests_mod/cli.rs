@@ -7,7 +7,7 @@ fn help_flag_shows_usage() {
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("Usage:"), "help should contain Usage: {stdout}");
-    assert!(stdout.contains("count-dirty"), "help should list subcommands: {stdout}");
+    assert!(stdout.contains("count"), "help should list subcommands: {stdout}");
 }
 
 #[test]
