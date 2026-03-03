@@ -24,11 +24,14 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Build release binary
         run: cargo build --release
 
       - name: Run tests
-        run: cargo test --release
+        run: cargo nextest run --release
 
       - name: Rename binary with target triple
         run: cp ./target/release/rmg ./target/release/rmg-${{ matrix.target }}

@@ -71,6 +71,6 @@ pub fn build_rsb(_project: &Path) -> Result<bool> {
     if !Path::new("rsb.toml").exists() {
         return Ok(false);
     }
-    check_call("rsb", &["build"])?;
+    check_call("rsb", &["--quiet", "build"])?;
     Ok(true)
 }
