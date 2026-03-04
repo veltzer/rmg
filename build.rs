@@ -35,6 +35,21 @@ fn main() {
     println!("cargo:rustc-env=RMG_GIT_DIRTY={dirty_flag}");
     println!("cargo:rustc-env=RMG_RUSTC_SEMVER={rustc_ver}");
 
+    let manifest = std::path::Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
+        .join("Cargo.toml");
+    let edition = std::fs::read_to_string(&manifest)
+        .ok()
+        .and_then(|content| {
+            content
+                .lines()
+                .find(|l| l.starts_with("edition"))
+                .and_then(|l| l.split('=').nth(1))
+                .map(|v| v.trim().trim_matches('"').to_owned())
+        })
+        .unwrap_or_else(|| "unknown".to_owned());
+    println!("cargo:rustc-env=RMG_RUST_EDITION={edition}");
+    println!("cargo:rerun-if-changed=Cargo.toml");
+
     // Only re-run when the git HEAD or branch ref changes.
     println!("cargo:rerun-if-changed=.git/HEAD");
     // Read .git/HEAD to find the current ref and watch it.

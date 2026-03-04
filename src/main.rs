@@ -28,6 +28,7 @@ fn main() -> Result<()> {
         println!("RMG_GIT_BRANCH: {}", env!("RMG_GIT_BRANCH"));
         println!("RMG_GIT_DIRTY: {}", env!("RMG_GIT_DIRTY"));
         println!("RMG_RUSTC_SEMVER: {}", env!("RMG_RUSTC_SEMVER"));
+        println!("RMG_RUST_EDITION: {}", env!("RMG_RUST_EDITION"));
         return Ok(());
     }
 
