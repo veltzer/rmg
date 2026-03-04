@@ -42,6 +42,11 @@ pub fn discover_projects(config: &AppConfig) -> Result<Vec<PathBuf>> {
         found
     };
 
+    // If no projects found and the current directory is itself a git repo, use it.
+    if projects.is_empty() && PathBuf::from(".git").is_dir() {
+        projects.push(PathBuf::from("."));
+    }
+
     if !config.no_sort {
         projects.sort();
     }
