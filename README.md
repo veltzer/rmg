@@ -111,7 +111,8 @@ rmg complete bash >> ~/.bash_completion
 | `reset hard/soft/mixed` | Reset HEAD across all repositories |
 | `diff` | Show diff for all repositories |
 | `log` | Show recent commits (default 10) |
-| `tag` | List tags |
+| `tag local` | List local tags |
+| `tag remote` | List remote tags |
 | `remote` | Show remote URLs |
 | `prune` | Prune stale remote-tracking branches |
 | `gc` | Run git garbage collection |

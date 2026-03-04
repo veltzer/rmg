@@ -10,7 +10,7 @@ use std::path::Path;
 use anyhow::Result;
 use clap::Parser;
 
-use cli::{BranchWhat, BuildWhat, Cli, CleanWhat, Commands, CountWhat, ResetWhat, StashWhat};
+use cli::{BranchWhat, BuildWhat, Cli, CleanWhat, Commands, CountWhat, ResetWhat, StashWhat, TagWhat};
 use config::AppConfig;
 
 fn main() -> Result<()> {
@@ -137,8 +137,12 @@ fn main() -> Result<()> {
                 commands::log::do_log(project, count)
             })?;
         }
-        Commands::Tag => {
-            runner::do_for_all_projects(&config, &projects, commands::tag::do_tag)?;
+        Commands::Tag { what } => {
+            let tag_fn: fn(&Path) -> anyhow::Result<bool> = match what {
+                TagWhat::Local => commands::tag::tag_local,
+                TagWhat::Remote => commands::tag::tag_remote,
+            };
+            runner::do_for_all_projects(&config, &projects, tag_fn)?;
         }
         Commands::Remote => {
             runner::do_for_all_projects(&config, &projects, commands::remote::do_remote)?;

@@ -218,12 +218,20 @@ rmg log              # Show last 10 commits
 rmg log -n 5         # Show last 5 commits
 ```
 
-### `rmg tag`
+### `rmg tag local`
 
-List tags for each repo.
+List local tags for each repo.
 
 ```bash
-rmg tag
+rmg tag local
+```
+
+### `rmg tag remote`
+
+List remote tags for each repo.
+
+```bash
+rmg tag remote
 ```
 
 ### `rmg remote`

@@ -155,7 +155,11 @@ pub enum Commands {
         count: u32,
     },
     /// List tags
-    Tag,
+    Tag {
+        /// What tags to show
+        #[arg(value_enum)]
+        what: TagWhat,
+    },
     /// Show remote URLs
     Remote,
     /// Prune stale remote-tracking branches
@@ -251,6 +255,14 @@ pub enum StashWhat {
 }
 
 #[derive(Clone, ValueEnum)]
+pub enum TagWhat {
+    /// Show local tags
+    Local,
+    /// Show remote tags
+    Remote,
+}
+
+#[derive(Clone, ValueEnum)]
 pub enum ResetWhat {
     /// Hard reset: discard all changes (git reset --hard HEAD)
     Hard,
@@ -312,7 +324,6 @@ mod tests {
             "push",
             "fetch",
             "diff",
-            "tag",
             "remote",
             "prune",
             "gc",
@@ -343,6 +354,13 @@ mod tests {
         for what in branch_whats {
             let result = Cli::try_parse_from(["rmg", "branch", what]);
             assert!(result.is_ok(), "branch {what} should parse");
+        }
+
+        // tag requires a what argument
+        let tag_whats = ["local", "remote"];
+        for what in tag_whats {
+            let result = Cli::try_parse_from(["rmg", "tag", what]);
+            assert!(result.is_ok(), "tag {what} should parse");
         }
 
         // reset requires a what argument
