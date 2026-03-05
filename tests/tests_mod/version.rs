@@ -1,10 +1,10 @@
 use tempfile::TempDir;
-use crate::common::{run_rmg, stdout_str};
+use crate::common::{run_rsmultigit, stdout_str};
 
 #[test]
 fn version_subcommand_prints_info() {
     let tmp = TempDir::new().unwrap();
-    let output = run_rmg(tmp.path(), &["version"]);
+    let output = run_rsmultigit(tmp.path(), &["version"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("RSMultiGit"), "version output should contain 'RSMultiGit'");
@@ -16,7 +16,7 @@ fn version_subcommand_prints_info() {
 #[test]
 fn version_flag_prints_short_version() {
     let tmp = TempDir::new().unwrap();
-    let output = run_rmg(tmp.path(), &["--version"]);
+    let output = run_rsmultigit(tmp.path(), &["--version"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.starts_with("rsmultigit "), "expected 'rsmultigit ...' but got: {stdout}");

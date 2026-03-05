@@ -42,7 +42,7 @@ tests/
 
 | Function | Description |
 |----------|-------------|
-| `run_rmg(dir, args)` | Run the rsmultigit binary with given args in a directory |
+| `run_rsmultigit(dir, args)` | Run the rsmultigit binary with given args in a directory |
 | `stdout_str(output)` | Extract trimmed stdout from command output |
 | `stderr_str(output)` | Extract trimmed stderr from command output |
 | `setup_git_repos(names)` | Create a temp dir with initialized git repos |
@@ -53,17 +53,17 @@ tests/
 1. Create a new file in `tests/tests_mod/`
 2. Add a `#[path]` module entry in `tests/main.rs`
 3. Use `setup_git_repos()` to create test fixtures
-4. Use `run_rmg()` to execute commands and assert on output
+4. Use `run_rsmultigit()` to execute commands and assert on output
 
 Example:
 
 ```rust
-use crate::common::{run_rmg, stdout_str, setup_git_repos};
+use crate::common::{run_rsmultigit, stdout_str, setup_git_repos};
 
 #[test]
 fn my_new_test() {
     let tmp = setup_git_repos(&["repo1", "repo2"]);
-    let output = run_rmg(tmp.path(), &["list-projects"]);
+    let output = run_rsmultigit(tmp.path(), &["list-projects"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("repo1"));

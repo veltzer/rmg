@@ -1,10 +1,10 @@
 use std::fs;
-use crate::common::{run_rmg, stdout_str, setup_git_repos};
+use crate::common::{run_rsmultigit, stdout_str, setup_git_repos};
 
 #[test]
 fn status_clean_repos_no_output() {
     let tmp = setup_git_repos(&["a", "b"]);
-    let output = run_rmg(tmp.path(), &["status"]);
+    let output = run_rsmultigit(tmp.path(), &["status"]);
     assert!(output.status.success());
     // Clean repos have no status output, so nothing should be printed
     let stdout = stdout_str(&output);
@@ -29,7 +29,7 @@ fn status_shows_dirty_repo() {
         .unwrap();
     fs::write(&file, "modified").unwrap();
 
-    let output = run_rmg(tmp.path(), &["status"]);
+    let output = run_rsmultigit(tmp.path(), &["status"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("dirty"), "should show the dirty repo: {stdout}");
@@ -54,7 +54,7 @@ fn dirty_subcommand_shows_diff_stat() {
         .unwrap();
     fs::write(&file, "changed").unwrap();
 
-    let output = run_rmg(tmp.path(), &["dirty"]);
+    let output = run_rsmultigit(tmp.path(), &["dirty"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("repo"), "should show the repo name: {stdout}");

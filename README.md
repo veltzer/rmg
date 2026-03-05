@@ -4,7 +4,7 @@ A fast CLI tool for managing multiple git repositories at once. Run status check
 
 ## Documentation
 
-Full documentation: <https://veltzer.github.io/rmg/>
+Full documentation: <https://veltzer.github.io/rsmultigit/>
 
 ## Features
 
@@ -24,10 +24,10 @@ Pre-built binaries are available for x86_64 and aarch64 (arm64).
 
 ```bash
 # x86_64
-gh release download latest --repo veltzer/rmg --pattern 'rsmultigit-x86_64-unknown-linux-gnu' --output rsmultigit --clobber
+gh release download latest --repo veltzer/rsmultigit --pattern 'rsmultigit-x86_64-unknown-linux-gnu' --output rsmultigit --clobber
 
 # aarch64 / arm64
-gh release download latest --repo veltzer/rmg --pattern 'rsmultigit-aarch64-unknown-linux-gnu' --output rsmultigit --clobber
+gh release download latest --repo veltzer/rsmultigit --pattern 'rsmultigit-aarch64-unknown-linux-gnu' --output rsmultigit --clobber
 
 chmod +x rsmultigit
 sudo mv rsmultigit /usr/local/bin/
@@ -37,10 +37,10 @@ Or without the GitHub CLI:
 
 ```bash
 # x86_64
-curl -Lo rsmultigit https://github.com/veltzer/rmg/releases/download/latest/rsmultigit-x86_64-unknown-linux-gnu
+curl -Lo rsmultigit https://github.com/veltzer/rsmultigit/releases/download/latest/rsmultigit-x86_64-unknown-linux-gnu
 
 # aarch64 / arm64
-curl -Lo rsmultigit https://github.com/veltzer/rmg/releases/download/latest/rsmultigit-aarch64-unknown-linux-gnu
+curl -Lo rsmultigit https://github.com/veltzer/rsmultigit/releases/download/latest/rsmultigit-aarch64-unknown-linux-gnu
 
 chmod +x rsmultigit
 sudo mv rsmultigit /usr/local/bin/

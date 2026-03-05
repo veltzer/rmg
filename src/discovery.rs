@@ -25,7 +25,7 @@ pub fn discover_projects(config: &AppConfig) -> Result<Vec<PathBuf>> {
             .collect()
     } else {
         // Glob-based discovery: try the configured pattern, and if that
-        // yields nothing also try "*" so rmg works when immediate
+        // yields nothing also try "*" so rsmultigit works when immediate
         // subdirectories are already git repos.
         let mut found: Vec<PathBuf> = glob::glob(&config.glob)
             .context("invalid glob pattern")?

@@ -3,8 +3,8 @@
 ## Build from source
 
 ```bash
-git clone https://github.com/veltzer/rmg.git
-cd rmg
+git clone https://github.com/veltzer/rsmultigit.git
+cd rsmultigit
 cargo build --release
 ```
 

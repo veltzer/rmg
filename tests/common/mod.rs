@@ -6,9 +6,9 @@ use std::process::{Command, Output};
 use tempfile::TempDir;
 
 /// Run the rsmultigit binary with the given arguments, using `dir` as the working directory.
-pub fn run_rmg(dir: &Path, args: &[&str]) -> Output {
-    let rmg_path = env!("CARGO_BIN_EXE_rsmultigit");
-    Command::new(rmg_path)
+pub fn run_rsmultigit(dir: &Path, args: &[&str]) -> Output {
+    let bin_path = env!("CARGO_BIN_EXE_rsmultigit");
+    Command::new(bin_path)
         .current_dir(dir)
         .args(args)
         .output()
