@@ -14,9 +14,6 @@ fn main() {
     let sha = git(&["rev-parse", "HEAD"]);
     let branch = git(&["rev-parse", "--abbrev-ref", "HEAD"]);
     let describe = git(&["describe", "--tags", "--always"]);
-    let dirty = git(&["status", "--porcelain"]);
-    let dirty_flag = if dirty.is_empty() { "false" } else { "true" };
-
     let rustc_ver = Command::new("rustc")
         .arg("--version")
         .output()
@@ -24,30 +21,48 @@ fn main() {
         .filter(|o| o.status.success())
         .and_then(|o| {
             let s = String::from_utf8_lossy(&o.stdout).to_string();
-            // "rustc 1.93.1 (083ac5135 ...)" -> "1.93.1"
             s.split_whitespace().nth(1).map(|v| v.to_owned())
         })
         .unwrap_or_else(|| "unknown".to_owned());
 
-    println!("cargo:rustc-env=RSMULTIGIT_GIT_SHA={sha}");
-    println!("cargo:rustc-env=RSMULTIGIT_GIT_BRANCH={branch}");
-    println!("cargo:rustc-env=RSMULTIGIT_GIT_DESCRIBE={describe}");
-    println!("cargo:rustc-env=RSMULTIGIT_GIT_DIRTY={dirty_flag}");
-    println!("cargo:rustc-env=RSMULTIGIT_RUSTC_SEMVER={rustc_ver}");
-
-    let manifest = std::path::Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("Cargo.toml");
-    let edition = std::fs::read_to_string(&manifest)
+    let edition = std::fs::read_to_string("Cargo.toml")
         .ok()
-        .and_then(|content| {
-            content
-                .lines()
-                .find(|l| l.starts_with("edition"))
-                .and_then(|l| l.split('=').nth(1))
-                .map(|v| v.trim().trim_matches('"').to_owned())
-        })
+        .and_then(|s| s.lines()
+            .find(|l| l.starts_with("edition"))
+            .and_then(|l| l.split('=').nth(1))
+            .map(|v| v.trim().trim_matches('"').to_owned()))
         .unwrap_or_else(|| "unknown".to_owned());
-    println!("cargo:rustc-env=RSMULTIGIT_RUST_EDITION={edition}");
+    let is_dirty = Command::new("git")
+        .args(["diff", "--quiet", "HEAD"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|s| !s.success());
+    let dirty_str = if is_dirty { "true" } else { "false" };
+    let describe = if is_dirty {
+        format!("{describe}-dirty")
+    } else {
+        describe
+    };
+
+    let build_timestamp = {
+        let output = Command::new("date")
+            .arg("+%Y-%m-%d %H:%M:%S")
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+            .unwrap_or_else(|| "unknown".to_owned());
+        output
+    };
+
+    println!("cargo:rustc-env=RUST_EDITION={edition}");
+    println!("cargo:rustc-env=GIT_SHA={sha}");
+    println!("cargo:rustc-env=GIT_BRANCH={branch}");
+    println!("cargo:rustc-env=GIT_DIRTY={dirty_str}");
+    println!("cargo:rustc-env=RUSTC_SEMVER={rustc_ver}");
+    println!("cargo:rustc-env=GIT_DESCRIBE={describe}");
+    println!("cargo:rustc-env=BUILD_TIMESTAMP={build_timestamp}");
     println!("cargo:rerun-if-changed=Cargo.toml");
 
     // Only re-run when the git HEAD or branch ref changes.

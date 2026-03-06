@@ -22,13 +22,14 @@ fn main() -> Result<()> {
         return Ok(());
     }
     if matches!(&cli.command, Commands::Version) {
-        println!("RSMultiGit {} by {}", env!("CARGO_PKG_VERSION"), env!("CARGO_PKG_AUTHORS"));
-        println!("RSMULTIGIT_GIT_DESCRIBE: {}", env!("RSMULTIGIT_GIT_DESCRIBE"));
-        println!("RSMULTIGIT_GIT_SHA: {}", env!("RSMULTIGIT_GIT_SHA"));
-        println!("RSMULTIGIT_GIT_BRANCH: {}", env!("RSMULTIGIT_GIT_BRANCH"));
-        println!("RSMULTIGIT_GIT_DIRTY: {}", env!("RSMULTIGIT_GIT_DIRTY"));
-        println!("RSMULTIGIT_RUSTC_SEMVER: {}", env!("RSMULTIGIT_RUSTC_SEMVER"));
-        println!("RSMULTIGIT_RUST_EDITION: {}", env!("RSMULTIGIT_RUST_EDITION"));
+        println!("rsmultigit {} by {}", env!("CARGO_PKG_VERSION"), env!("CARGO_PKG_AUTHORS"));
+        println!("GIT_DESCRIBE: {}", env!("GIT_DESCRIBE"));
+        println!("GIT_SHA: {}", env!("GIT_SHA"));
+        println!("GIT_BRANCH: {}", env!("GIT_BRANCH"));
+        println!("GIT_DIRTY: {}", env!("GIT_DIRTY"));
+        println!("RUSTC_SEMVER: {}", env!("RUSTC_SEMVER"));
+        println!("RUST_EDITION: {}", env!("RUST_EDITION"));
+        println!("BUILD_TIMESTAMP: {}", env!("BUILD_TIMESTAMP"));
         return Ok(());
     }
 
