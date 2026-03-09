@@ -14,6 +14,7 @@ fn main() {
     let sha = git(&["rev-parse", "HEAD"]);
     let branch = git(&["rev-parse", "--abbrev-ref", "HEAD"]);
     let describe = git(&["describe", "--tags", "--always"]);
+
     let rustc_ver = Command::new("rustc")
         .arg("--version")
         .output()
@@ -45,16 +46,13 @@ fn main() {
         describe
     };
 
-    let build_timestamp = {
-        let output = Command::new("date")
-            .arg("+%Y-%m-%d %H:%M:%S")
-            .output()
-            .ok()
-            .filter(|o| o.status.success())
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
-            .unwrap_or_else(|| "unknown".to_owned());
-        output
-    };
+    let build_timestamp = Command::new("date")
+        .arg("+%Y-%m-%d %H:%M:%S")
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+        .unwrap_or_else(|| "unknown".to_owned());
 
     println!("cargo:rustc-env=RUST_EDITION={edition}");
     println!("cargo:rustc-env=GIT_SHA={sha}");
@@ -63,13 +61,9 @@ fn main() {
     println!("cargo:rustc-env=RUSTC_SEMVER={rustc_ver}");
     println!("cargo:rustc-env=GIT_DESCRIBE={describe}");
     println!("cargo:rustc-env=BUILD_TIMESTAMP={build_timestamp}");
-    println!("cargo:rerun-if-changed=Cargo.toml");
 
-    // Only re-run when the git HEAD or branch ref changes.
+    println!("cargo:rerun-if-changed=Cargo.toml");
     println!("cargo:rerun-if-changed=.git/HEAD");
-    // Read .git/HEAD to find the current ref and watch it.
-    // The loose ref file may not exist if git has packed the ref,
-    // so fall back to watching .git/packed-refs.
     if let Ok(head) = std::fs::read_to_string(".git/HEAD")
         && let Some(refpath) = head.trim().strip_prefix("ref: ")
     {
