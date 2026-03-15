@@ -1,5 +1,13 @@
 # Installation
 
+## Install from crates.io
+
+```bash
+cargo install rsmultigit
+```
+
+This downloads, compiles, and installs the latest published version into `~/.cargo/bin/`.
+
 ## Build from source
 
 ```bash
