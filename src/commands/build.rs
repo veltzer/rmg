@@ -63,7 +63,7 @@ pub fn build_pydmt_build_venv(_project: &Path) -> Result<bool> {
     Ok(true)
 }
 
-/// Run cargo build, but only if the project has a Cargo.toml file.
+/// Run cargo build (debug + release), but only if the project has a Cargo.toml file.
 pub fn build_cargo(project: &Path) -> Result<bool> {
     if is_build_disabled() {
         return Ok(false);
@@ -72,6 +72,7 @@ pub fn build_cargo(project: &Path) -> Result<bool> {
         return Ok(false);
     }
     check_call("cargo", &["build"])?;
+    check_call("cargo", &["build", "--release"])?;
     Ok(true)
 }
 
