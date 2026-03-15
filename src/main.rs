@@ -204,6 +204,7 @@ fn main() -> Result<()> {
                 BuildWhat::VenvPydmt => commands::build::build_venv_pydmt,
                 BuildWhat::PydmtBuildVenv => commands::build::build_pydmt_build_venv,
                 BuildWhat::Rsbuild => commands::build::build_rsbuild,
+                BuildWhat::Cargo => commands::build::build_cargo,
             };
             runner::do_for_all_projects(&config, &projects, build_fn)?;
         }
