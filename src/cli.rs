@@ -150,7 +150,7 @@ pub enum Commands {
         /// Regular expression to search for
         regexp: String,
         /// Only show filenames
-        #[arg(long, default_value_t = false)]
+        #[arg(short = 'l', long, default_value_t = false)]
         files: bool,
     },
     /// Show the most recent tag per repo
@@ -449,6 +449,18 @@ mod tests {
     #[test]
     fn parse_grep_with_files_flag() {
         let cli = parse(&["rsmultigit", "grep", "--files", "TODO"]);
+        match &cli.command {
+            Commands::Grep { regexp, files } => {
+                assert_eq!(regexp, "TODO");
+                assert!(files);
+            }
+            _ => panic!("expected Grep"),
+        }
+    }
+
+    #[test]
+    fn parse_grep_with_short_files_flag() {
+        let cli = parse(&["rsmultigit", "grep", "-l", "TODO"]);
         match &cli.command {
             Commands::Grep { regexp, files } => {
                 assert_eq!(regexp, "TODO");
