@@ -62,7 +62,7 @@ where
             format!("failed to cd into {}", abs_path.display())
         })?;
 
-        if config.verbose && !config.terse {
+        if !config.terse {
             print_project_header(project);
         }
 
