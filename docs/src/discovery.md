@@ -19,7 +19,7 @@ rsmultigit --folders /path/to/repoA,/path/to/repoB status
 When `--no-glob` is set, RSMultiGit scans immediate subdirectories of the current directory:
 
 ```bash
-rsmultigit --no-glob list-projects
+rsmultigit --no-glob list-repos
 ```
 
 ### 3. Glob-based discovery (default)
@@ -29,18 +29,18 @@ By default, RSMultiGit uses the glob pattern `*/*` to find projects two levels d
 ```bash
 # Works from ~/git/veltzer (repos are at */*)
 cd ~/git
-rsmultigit list-projects
+rsmultigit list-repos
 
 # Also works from ~/git/veltzer (repos are at *)
 cd ~/git/veltzer
-rsmultigit list-projects
+rsmultigit list-repos
 ```
 
 A custom glob can be provided:
 
 ```bash
-rsmultigit --glob "python-*" list-projects
-rsmultigit --glob "org/team-*" list-projects
+rsmultigit --glob "python-*" list-repos
+rsmultigit --glob "org/team-*" list-repos
 ```
 
 ## Sorting

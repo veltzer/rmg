@@ -25,7 +25,7 @@ Example:
 rsmultigit --stats --terse count-dirty       # Just print "3/50"
 rsmultigit --no-stop pull                    # Pull all, skip failures
 rsmultigit --glob "python-*" status          # Only match python-* dirs
-rsmultigit --folders a,b,c list-projects     # Operate on specific folders
+rsmultigit --folders a,b,c list-repos     # Operate on specific folders
 ```
 
 ## Count Commands
@@ -81,12 +81,12 @@ Show `git diff --stat` output for repositories with modifications.
 rsmultigit dirty
 ```
 
-### `rsmultigit list-projects`
+### `rsmultigit list-repos`
 
 List all discovered projects.
 
 ```bash
-rsmultigit list-projects
+rsmultigit list-repos
 ```
 
 ### `rsmultigit age`

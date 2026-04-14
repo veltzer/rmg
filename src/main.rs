@@ -62,7 +62,7 @@ fn main() -> Result<()> {
         Commands::Dirty => {
             runner::print_if_data(&config, &projects, commands::status::do_dirty)?;
         }
-        Commands::ListProjects => {
+        Commands::ListRepos => {
             // Prints one path per line with no header — the project path *is* the data,
             // so the bracketed header would be redundant. --verbose re-enables the
             // standard [project]\n<data> format for consistency with other commands.

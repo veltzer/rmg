@@ -6,7 +6,7 @@ Navigate to a directory that contains git repositories as subdirectories, then r
 
 ```bash
 cd ~/git/myorg
-rsmultigit list-projects
+rsmultigit list-repos
 ```
 
 RSMultiGit will automatically discover git repos by looking for directories containing a `.git` folder. It searches both immediate subdirectories (`*`) and two levels deep (`*/*`).

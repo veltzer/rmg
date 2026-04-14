@@ -48,7 +48,7 @@ All commands use one of three patterns in `runner.rs`:
 
 1. **`do_count`** — Boolean test per repo using git2 (no subprocess). Prints count summary. Used by: `count dirty/untracked/synchronized`.
 2. **`do_for_all_projects`** — Runs an action in each repo dir, returns `Result<bool>` (did work / skipped). Used by: `pull, push, fetch, grep, clean, build`, etc.
-3. **`print_if_data`** — Calls data function returning `Option<String>`, prints only if Some. Used by: `status, dirty, list-projects, age, authors`.
+3. **`print_if_data`** — Calls data function returning `Option<String>`, prints only if Some. Used by: `status, dirty, list-repos, age, authors`.
 
 ## Key Conventions
 

@@ -63,7 +63,7 @@ use crate::common::{run_rsmultigit, stdout_str, setup_git_repos};
 #[test]
 fn my_new_test() {
     let tmp = setup_git_repos(&["repo1", "repo2"]);
-    let output = run_rsmultigit(tmp.path(), &["list-projects"]);
+    let output = run_rsmultigit(tmp.path(), &["list-repos"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("repo1"));

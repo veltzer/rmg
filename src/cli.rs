@@ -1,3 +1,8 @@
+// CLI parser limitations we've deliberately left unaddressed are documented in
+// docs/src/cli-parser-notes.md — notably, clap 4 has no per-subcommand
+// `help_heading`, so the flat alphabetical subcommand listing in `--help` is
+// intentional. Read those notes before attempting to "categorize" subcommands.
+
 use std::io;
 
 use clap::{CommandFactory, Parser, Subcommand, ValueEnum};
@@ -137,7 +142,7 @@ pub enum Commands {
     LastTag,
     /// Print the path of every configured repo, one per line (no header by default).
     /// Pass --verbose to also emit the [project] header for each entry.
-    ListProjects,
+    ListRepos,
     /// Show recent commits
     Log {
         /// Number of commits to show
@@ -295,7 +300,7 @@ mod tests {
         let subcommands = [
             "status",
             "dirty",
-            "list-projects",
+            "list-repos",
             "age",
             "authors",
             "size",
@@ -476,15 +481,15 @@ mod tests {
 
     #[test]
     fn parse_jobs_flag() {
-        let cli = parse(&["rsmultigit", "-j", "4", "list-projects"]);
+        let cli = parse(&["rsmultigit", "-j", "4", "list-repos"]);
         assert_eq!(cli.jobs, 4);
-        let cli = parse(&["rsmultigit", "--jobs", "8", "list-projects"]);
+        let cli = parse(&["rsmultigit", "--jobs", "8", "list-repos"]);
         assert_eq!(cli.jobs, 8);
     }
 
     #[test]
     fn default_jobs_is_one() {
-        let cli = parse(&["rsmultigit", "list-projects"]);
+        let cli = parse(&["rsmultigit", "list-repos"]);
         assert_eq!(cli.jobs, 1);
     }
 

@@ -7,4 +7,5 @@
 - [Configuration](configuration.md)
 - [Project Discovery](discovery.md)
 - [Architecture](architecture.md)
+- [CLI Parser Notes](cli-parser-notes.md)
 - [Testing](testing.md)

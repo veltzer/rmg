@@ -74,7 +74,7 @@ rsmultigit grep "TODO"
 rsmultigit status
 
 # List discovered projects
-rsmultigit list-projects
+rsmultigit list-repos
 
 # Build all rsconstruct projects
 rsmultigit build rsconstruct
@@ -93,7 +93,7 @@ rsmultigit complete bash >> ~/.bash_completion
 | `count synchronized` | Count non-synchronized repositories (ahead/behind remote) |
 | `status` | Show status of repositories |
 | `dirty` | Show dirty repositories |
-| `list-projects` | List discovered projects |
+| `list-repos` | List discovered projects |
 | `age` | Show the age of the last commit per repo |
 | `authors` | Show unique commit authors per repo |
 | `config <key>` | Show a git config value across all repos |

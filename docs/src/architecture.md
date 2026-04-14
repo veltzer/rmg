@@ -40,7 +40,7 @@ For action commands (`pull`, `clean-hard`, `diff`, `grep`, `branch-*`, `build-*`
 
 ### `print_if_data`
 
-For status commands (`status`, `dirty`, `list-projects`). Changes into each project directory, calls a data function. If it returns `Some(text)`, prints the project name and data. If `None`, the project is silently skipped.
+For status commands (`status`, `dirty`, `list-repos`). Changes into each project directory, calls a data function. If it returns `Some(text)`, prints the project name and data. If `None`, the project is silently skipped.
 
 ## Git inspection
 
