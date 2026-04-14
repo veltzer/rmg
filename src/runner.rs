@@ -31,6 +31,14 @@ fn print_project_header(project: &Path) {
     println!("[{}]", project.display());
 }
 
+/// The `[project]` header line is suppressed when either `--no-header` or
+/// `--terse` is set. `--terse` has a richer meaning in some runners (e.g.
+/// switching `print_if_data` to "project-name only" mode); this helper only
+/// captures the shared "should I emit the bracketed header?" rule.
+fn headers_suppressed(config: &AppConfig) -> bool {
+    config.no_header || config.terse
+}
+
 /// Execute `work` across `projects`, optionally in parallel. Results are delivered
 /// to `on_result` in input order on the calling thread so stdout stays ordered.
 fn for_each_project_ordered<T, W, R>(
@@ -167,10 +175,11 @@ where
 
     // Serial fast path: action writes live to inherited stdout/stderr.
     if jobs <= 1 || projects.len() <= 1 {
+        let show_header = !headers_suppressed(config);
         for project in projects {
             let abs = absolute(project, &base);
 
-            if !config.terse && config.verbose {
+            if show_header && config.verbose {
                 print_project_header(project);
             }
 
@@ -190,7 +199,7 @@ where
                 continue;
             }
 
-            if !config.terse && !config.verbose {
+            if show_header && !config.verbose {
                 print_project_header(project);
             }
 
@@ -237,8 +246,9 @@ where
         |project, result| -> Result<()> {
             match result {
                 Ok((passed, captured)) => {
-                    if passed || (config.verbose && !config.terse) {
-                        if !config.terse {
+                    let show_header = !headers_suppressed(config);
+                    if passed || (config.verbose && show_header) {
+                        if show_header {
                             print_project_header(project);
                         }
                         if passed {
@@ -284,18 +294,26 @@ where
             match result {
                 Ok(Some(data)) => {
                     if !config.print_not {
-                        if !config.terse {
-                            writeln!(out, "[{}]", project.display()).ok();
-                        }
-                        if !config.no_output {
-                            writeln!(out, "{data}").ok();
+                        if config.terse {
+                            writeln!(out, "{}", project.display()).ok();
+                        } else {
+                            if !config.no_header {
+                                writeln!(out, "[{}]", project.display()).ok();
+                            }
+                            if !config.no_output {
+                                writeln!(out, "{data}").ok();
+                            }
                         }
                     }
                     Ok(())
                 }
                 Ok(None) => {
-                    if (config.print_not || config.verbose) && !config.terse {
-                        writeln!(out, "[{}]", project.display()).ok();
+                    if config.print_not || config.verbose {
+                        if config.terse {
+                            writeln!(out, "{}", project.display()).ok();
+                        } else if !config.no_header {
+                            writeln!(out, "[{}]", project.display()).ok();
+                        }
                     }
                     Ok(())
                 }
