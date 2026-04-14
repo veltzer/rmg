@@ -4,97 +4,76 @@ use anyhow::Result;
 
 use crate::subprocess_utils::{check_call, check_call_ve};
 
-/// Check if the project has a mechanism to disable build (e.g. .disable file).
-fn is_build_disabled() -> bool {
-    Path::new(".disable").exists()
+fn is_build_disabled(project: &Path) -> bool {
+    project.join(".disable").exists()
 }
 
-fn has_pydmt_config() -> bool {
-    Path::new(".pydmt.config").exists()
+fn has_pydmt_config(project: &Path) -> bool {
+    project.join(".pydmt.config").exists()
 }
 
 // --- Check functions (cheap predicates: should we build this project?) ---
 
-pub fn check_bootstrap(_project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled())
+pub fn check_not_disabled(project: &Path) -> Result<bool> {
+    Ok(!is_build_disabled(project))
 }
 
-pub fn check_pydmt(_project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled() && has_pydmt_config())
-}
-
-pub fn check_make(_project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled())
-}
-
-pub fn check_venv_make(_project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled())
-}
-
-pub fn check_venv_pydmt(_project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled() && has_pydmt_config())
-}
-
-pub fn check_pydmt_build_venv(_project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled() && has_pydmt_config())
+pub fn check_pydmt(project: &Path) -> Result<bool> {
+    Ok(!is_build_disabled(project) && has_pydmt_config(project))
 }
 
 pub fn check_cargo(project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled() && project.join("Cargo.toml").exists())
+    Ok(!is_build_disabled(project) && project.join("Cargo.toml").exists())
 }
 
-pub fn check_cargo_publish(project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled() && project.join("Cargo.toml").exists())
-}
-
-pub fn check_rsconstruct(_project: &Path) -> Result<bool> {
-    Ok(!is_build_disabled() && Path::new("rsconstruct.toml").exists())
+pub fn check_rsconstruct(project: &Path) -> Result<bool> {
+    Ok(!is_build_disabled(project) && project.join("rsconstruct.toml").exists())
 }
 
 // --- Action functions (do the actual build, assuming check already passed) ---
 
-pub fn build_bootstrap(_project: &Path) -> Result<bool> {
-    check_call("python", &["bootstrap.py"])?;
+pub fn build_bootstrap(project: &Path) -> Result<bool> {
+    check_call(project, "python", &["bootstrap.py"])?;
     Ok(true)
 }
 
-pub fn build_pydmt(_project: &Path) -> Result<bool> {
-    check_call("pydmt", &["build"])?;
+pub fn build_pydmt(project: &Path) -> Result<bool> {
+    check_call(project, "pydmt", &["build"])?;
     Ok(true)
 }
 
-pub fn build_make(_project: &Path) -> Result<bool> {
-    check_call("make", &[])?;
+pub fn build_make(project: &Path) -> Result<bool> {
+    check_call(project, "make", &[])?;
     Ok(true)
 }
 
-pub fn build_venv_make(_project: &Path) -> Result<bool> {
-    check_call_ve(&["make"])?;
+pub fn build_venv_make(project: &Path) -> Result<bool> {
+    check_call_ve(project, &["make"])?;
     Ok(true)
 }
 
-pub fn build_venv_pydmt(_project: &Path) -> Result<bool> {
-    check_call_ve(&["pydmt", "build"])?;
+pub fn build_venv_pydmt(project: &Path) -> Result<bool> {
+    check_call_ve(project, &["pydmt", "build"])?;
     Ok(true)
 }
 
-pub fn build_pydmt_build_venv(_project: &Path) -> Result<bool> {
-    check_call("pydmt", &["build_venv"])?;
+pub fn build_pydmt_build_venv(project: &Path) -> Result<bool> {
+    check_call(project, "pydmt", &["build_venv"])?;
     Ok(true)
 }
 
-pub fn build_cargo(_project: &Path) -> Result<bool> {
-    check_call("cargo", &["build"])?;
-    check_call("cargo", &["build", "--release"])?;
+pub fn build_cargo(project: &Path) -> Result<bool> {
+    check_call(project, "cargo", &["build"])?;
+    check_call(project, "cargo", &["build", "--release"])?;
     Ok(true)
 }
 
-pub fn build_cargo_publish(_project: &Path) -> Result<bool> {
-    check_call("cargo", &["publish"])?;
+pub fn build_cargo_publish(project: &Path) -> Result<bool> {
+    check_call(project, "cargo", &["publish"])?;
     Ok(true)
 }
 
-pub fn build_rsconstruct(_project: &Path) -> Result<bool> {
-    check_call("rsconstruct", &["--quiet", "build"])?;
+pub fn build_rsconstruct(project: &Path) -> Result<bool> {
+    check_call(project, "rsconstruct", &["--quiet", "build"])?;
     Ok(true)
 }

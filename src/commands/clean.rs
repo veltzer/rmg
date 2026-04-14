@@ -5,26 +5,26 @@ use anyhow::Result;
 use crate::subprocess_utils::check_call;
 
 /// Hard-clean the repository (git clean -ffxd).
-pub fn clean_hard(_project: &Path) -> Result<bool> {
-    check_call("git", &["clean", "-ffxd"])?;
+pub fn clean_hard(project: &Path) -> Result<bool> {
+    check_call(project, "git", &["clean", "-ffxd"])?;
     Ok(true)
 }
 
 /// Soft-clean the repository: remove untracked files only (git clean -fd).
-pub fn clean_soft(_project: &Path) -> Result<bool> {
-    check_call("git", &["clean", "-fd"])?;
+pub fn clean_soft(project: &Path) -> Result<bool> {
+    check_call(project, "git", &["clean", "-fd"])?;
     Ok(true)
 }
 
 /// Run `make clean`.
-pub fn clean_make(_project: &Path) -> Result<bool> {
-    check_call("make", &["clean"])?;
+pub fn clean_make(project: &Path) -> Result<bool> {
+    check_call(project, "make", &["clean"])?;
     Ok(true)
 }
 
 /// Discard unstaged working-tree changes (git checkout .).
-pub fn clean_git(_project: &Path) -> Result<bool> {
-    check_call("git", &["checkout", "."])?;
+pub fn clean_git(project: &Path) -> Result<bool> {
+    check_call(project, "git", &["checkout", "."])?;
     Ok(true)
 }
 
@@ -33,6 +33,6 @@ pub fn clean_cargo(project: &Path) -> Result<bool> {
     if !project.join("Cargo.toml").exists() {
         return Ok(false);
     }
-    check_call("cargo", &["clean"])?;
+    check_call(project, "cargo", &["clean"])?;
     Ok(true)
 }

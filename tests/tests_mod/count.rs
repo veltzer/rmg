@@ -4,7 +4,7 @@ use crate::common::{run_rsmultigit, stdout_str, setup_git_repos};
 #[test]
 fn count_dirty_clean_repos() {
     let tmp = setup_git_repos(&["a", "b"]);
-    let output = run_rsmultigit(tmp.path(), &["--stats", "count", "dirty"]);
+    let output = run_rsmultigit(tmp.path(), &["count", "dirty"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("0/2"), "clean repos should show 0/2: {stdout}");
@@ -29,7 +29,7 @@ fn count_dirty_with_modified_file() {
         .unwrap();
     fs::write(&file, "modified").unwrap();
 
-    let output = run_rsmultigit(tmp.path(), &["--stats", "count", "dirty"]);
+    let output = run_rsmultigit(tmp.path(), &["count", "dirty"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("1/2"), "one dirty repo should show 1/2: {stdout}");
@@ -40,7 +40,7 @@ fn untracked_detects_new_files() {
     let tmp = setup_git_repos(&["clean", "has_new"]);
     fs::write(tmp.path().join("has_new/untracked.txt"), "data").unwrap();
 
-    let output = run_rsmultigit(tmp.path(), &["--stats", "count", "untracked"]);
+    let output = run_rsmultigit(tmp.path(), &["count", "untracked"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert!(stdout.contains("1/2"), "one repo with untracked should show 1/2: {stdout}");
@@ -51,8 +51,8 @@ fn count_dirty_terse_suppresses_names() {
     let tmp = setup_git_repos(&["a", "b"]);
     fs::write(tmp.path().join("a/untracked.txt"), "x").unwrap();
 
-    // With --terse and --stats, should only print the count line
-    let output = run_rsmultigit(tmp.path(), &["--terse", "--stats", "count", "untracked"]);
+    // With --terse, project names are suppressed; only the count line remains.
+    let output = run_rsmultigit(tmp.path(), &["--terse", "count", "untracked"]);
     assert!(output.status.success());
     let stdout = stdout_str(&output);
     assert_eq!(stdout, "1/2");

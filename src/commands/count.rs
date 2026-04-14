@@ -3,13 +3,20 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use git2::Repository;
 
-/// Returns true if the repository has modified (dirty) files in its working directory.
-pub fn is_dirty(project: &Path) -> Result<bool> {
-    let repo = Repository::open(project)
-        .with_context(|| format!("failed to open repo at {}", project.display()))?;
+fn open_repo(project: &Path) -> Result<Repository> {
+    Repository::open(project)
+        .with_context(|| format!("failed to open repo at {}", project.display()))
+}
+
+/// Returns true if there are any dirty changes (modified, staged, or new in index)
+/// OR any untracked files. One status scan serves both questions.
+pub fn has_changes(project: &Path) -> Result<(bool, bool)> {
+    let repo = open_repo(project)?;
     let statuses = repo
         .statuses(None)
         .with_context(|| format!("failed to get statuses for {}", project.display()))?;
+    let mut dirty = false;
+    let mut untracked = false;
     for entry in statuses.iter() {
         let s = entry.status();
         if s.intersects(
@@ -23,86 +30,74 @@ pub fn is_dirty(project: &Path) -> Result<bool> {
                 | git2::Status::INDEX_TYPECHANGE
                 | git2::Status::INDEX_NEW,
         ) {
-            return Ok(true);
+            dirty = true;
+        }
+        if s.contains(git2::Status::WT_NEW) {
+            untracked = true;
+        }
+        if dirty && untracked {
+            break;
         }
     }
-    Ok(false)
+    Ok((dirty, untracked))
+}
+
+/// Returns true if the repository has modified (dirty) files in its working directory.
+pub fn is_dirty(project: &Path) -> Result<bool> {
+    Ok(has_changes(project)?.0)
 }
 
 /// Returns true if the repository has untracked files.
 pub fn has_untracked(project: &Path) -> Result<bool> {
-    let repo = Repository::open(project)
-        .with_context(|| format!("failed to open repo at {}", project.display()))?;
-    let statuses = repo
-        .statuses(None)
-        .with_context(|| format!("failed to get statuses for {}", project.display()))?;
-    for entry in statuses.iter() {
-        if entry.status().contains(git2::Status::WT_NEW) {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+    Ok(has_changes(project)?.1)
 }
 
-/// Returns true if the local branch is NOT synchronized with its upstream
-/// (i.e. there are commits ahead or behind).
-pub fn non_synchronized(project: &Path) -> Result<bool> {
-    let repo = Repository::open(project)
-        .with_context(|| format!("failed to open repo at {}", project.display()))?;
+/// Returns `Some((ahead, behind))` relative to `refs/remotes/origin/<current_branch>`,
+/// or `None` when the repo has no HEAD, no branch, or no upstream ref.
+fn ahead_behind(project: &Path) -> Result<Option<(usize, usize)>> {
+    let repo = open_repo(project)?;
 
     let head = match repo.head() {
         Ok(h) => h,
-        Err(_) => return Ok(false), // no HEAD, skip
+        Err(_) => return Ok(None),
     };
 
     let local_oid = match head.target() {
         Some(oid) => oid,
-        None => return Ok(false),
+        None => return Ok(None),
     };
 
     let branch_name = match head.shorthand() {
         Some(name) => name.to_string(),
-        None => return Ok(false),
+        None => return Ok(None),
     };
 
     let upstream_ref = format!("refs/remotes/origin/{branch_name}");
     let upstream_oid = match repo.refname_to_id(&upstream_ref) {
         Ok(oid) => oid,
-        Err(_) => return Ok(true), // no upstream → not synchronized
+        Err(_) => return Ok(None),
     };
 
-    let (ahead, behind) = repo.graph_ahead_behind(local_oid, upstream_oid)?;
-    Ok(ahead != 0 || behind != 0)
+    let counts = repo.graph_ahead_behind(local_oid, upstream_oid)?;
+    Ok(Some(counts))
+}
+
+/// Returns true if the local branch is NOT synchronized with its upstream.
+/// A repo with no upstream is considered non-synchronized.
+pub fn non_synchronized(project: &Path) -> Result<bool> {
+    match ahead_behind(project)? {
+        Some((ahead, behind)) => Ok(ahead != 0 || behind != 0),
+        None => Ok(true),
+    }
 }
 
 /// Returns true if the local branch has commits ahead of its upstream.
+/// Repos without an upstream have nothing to push to, so return false.
 pub fn is_ahead(project: &Path) -> Result<bool> {
-    let repo = Repository::open(project)
-        .with_context(|| format!("failed to open repo at {}", project.display()))?;
-
-    let head = match repo.head() {
-        Ok(h) => h,
-        Err(_) => return Ok(false),
-    };
-
-    let local_oid = match head.target() {
-        Some(oid) => oid,
-        None => return Ok(false),
-    };
-
-    let branch_name = match head.shorthand() {
-        Some(name) => name.to_string(),
-        None => return Ok(false),
-    };
-
-    let upstream_ref = format!("refs/remotes/origin/{branch_name}");
-    let upstream_oid = match repo.refname_to_id(&upstream_ref) {
-        Ok(oid) => oid,
-        Err(_) => return Ok(false), // no upstream → nothing to push to
-    };
-
-    let (ahead, _behind) = repo.graph_ahead_behind(local_oid, upstream_oid)?;
-    Ok(ahead != 0)
+    match ahead_behind(project)? {
+        Some((ahead, _)) => Ok(ahead != 0),
+        None => Ok(false),
+    }
 }
 
 #[cfg(test)]
@@ -139,7 +134,6 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = init_repo_with_commit(tmp.path());
 
-        // Create and commit a file
         let file_path = tmp.path().join("hello.txt");
         fs::write(&file_path, "hello").unwrap();
         let mut index = repo.index().unwrap();
@@ -152,7 +146,6 @@ mod tests {
         repo.commit(Some("HEAD"), &sig, &sig, "add file", &tree, &[&head])
             .unwrap();
 
-        // Modify the committed file
         fs::write(&file_path, "changed").unwrap();
         assert!(is_dirty(tmp.path()).unwrap());
     }
@@ -162,7 +155,6 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let repo = init_repo_with_commit(tmp.path());
 
-        // Create a new file and stage it (INDEX_NEW)
         fs::write(tmp.path().join("new.txt"), "new").unwrap();
         let mut index = repo.index().unwrap();
         index.add_path(std::path::Path::new("new.txt")).unwrap();
@@ -187,11 +179,27 @@ mod tests {
     }
 
     #[test]
+    fn has_changes_detects_both() {
+        let tmp = TempDir::new().unwrap();
+        init_repo_with_commit(tmp.path());
+        fs::write(tmp.path().join("untracked.txt"), "data").unwrap();
+        let (dirty, untracked) = has_changes(tmp.path()).unwrap();
+        assert!(!dirty);
+        assert!(untracked);
+    }
+
+    #[test]
     fn repo_without_upstream_is_non_synchronized() {
         let tmp = TempDir::new().unwrap();
         init_repo_with_commit(tmp.path());
-        // No remote set up, so non_synchronized should return true
         assert!(non_synchronized(tmp.path()).unwrap());
+    }
+
+    #[test]
+    fn repo_without_upstream_is_not_ahead() {
+        let tmp = TempDir::new().unwrap();
+        init_repo_with_commit(tmp.path());
+        assert!(!is_ahead(tmp.path()).unwrap());
     }
 
     #[test]

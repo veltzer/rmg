@@ -26,10 +26,6 @@ pub struct Cli {
     #[arg(long, global = true, default_value_t = false)]
     pub terse: bool,
 
-    /// Show statistics
-    #[arg(long, global = true, default_value_t = false)]
-    pub stats: bool,
-
     /// Suppress command output
     #[arg(long, global = true, default_value_t = false)]
     pub no_output: bool,
@@ -41,15 +37,6 @@ pub struct Cli {
     /// Print repos that do NOT match (invert selection)
     #[arg(long, global = true, default_value_t = false)]
     pub print_not: bool,
-
-    // Debug
-    /// Pass --verbose to git commands
-    #[arg(long, global = true, default_value_t = false)]
-    pub git_verbose: bool,
-
-    /// Pass --quiet to git commands
-    #[arg(long, global = true, default_value_t = false)]
-    pub git_quiet: bool,
 
     // Main
     /// Do not sort project list
@@ -75,6 +62,10 @@ pub struct Cli {
     /// Do not print 'no projects found' message
     #[arg(long, global = true, default_value_t = false)]
     pub no_print_no_projects: bool,
+
+    /// Number of parallel workers (default: 1; use 0 for num_cpus)
+    #[arg(short = 'j', long, global = true, default_value_t = 1)]
+    pub jobs: usize,
 
     #[command(subcommand)]
     pub command: Commands,
@@ -482,18 +473,31 @@ mod tests {
     #[test]
     fn parse_global_flags() {
         let cli = parse(&[
-            "rsmultigit", "--terse", "--stats", "--no-output", "--verbose", "--print-not",
+            "rsmultigit", "--terse", "--no-output", "--verbose", "--print-not",
             "--no-sort", "--no-stop", "--no-print-no-projects",
             "count", "dirty",
         ]);
         assert!(cli.terse);
-        assert!(cli.stats);
         assert!(cli.no_output);
         assert!(cli.verbose);
         assert!(cli.print_not);
         assert!(cli.no_sort);
         assert!(cli.no_stop);
         assert!(cli.no_print_no_projects);
+    }
+
+    #[test]
+    fn parse_jobs_flag() {
+        let cli = parse(&["rsmultigit", "-j", "4", "list-projects"]);
+        assert_eq!(cli.jobs, 4);
+        let cli = parse(&["rsmultigit", "--jobs", "8", "list-projects"]);
+        assert_eq!(cli.jobs, 8);
+    }
+
+    #[test]
+    fn default_jobs_is_one() {
+        let cli = parse(&["rsmultigit", "list-projects"]);
+        assert_eq!(cli.jobs, 1);
     }
 
     #[test]

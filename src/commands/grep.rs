@@ -1,9 +1,11 @@
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::Result;
 
+use crate::subprocess_utils::capture_output_allow_failure;
+
 /// Grep across the repository. Prefix output lines with the project name.
+/// `git grep` exit codes: 0 = match, 1 = no match, >=2 = error.
 pub fn do_grep(project: &Path, regexp: &str, files_only: bool) -> Result<bool> {
     let mut args = vec!["grep", "-n"];
     if files_only {
@@ -11,25 +13,25 @@ pub fn do_grep(project: &Path, regexp: &str, files_only: bool) -> Result<bool> {
     }
     args.push(regexp);
 
-    let output = Command::new("git").args(&args).output()?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let (code, stdout, stderr) = capture_output_allow_failure(project, "git", &args)?;
 
-    if stdout.is_empty() {
-        return Ok(false);
-    }
+    match code {
+        0 => {
+            let project_name = project
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
 
-    let project_name = project
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default();
-
-    for line in stdout.lines() {
-        if files_only {
-            println!("{project_name}/{line}");
-        } else {
-            println!("{project_name}: {line}");
+            for line in stdout.lines() {
+                if files_only {
+                    println!("{project_name}/{line}");
+                } else {
+                    println!("{project_name}: {line}");
+                }
+            }
+            Ok(true)
         }
+        1 => Ok(false),
+        _ => anyhow::bail!("git grep failed (exit {code}): {stderr}"),
     }
-
-    Ok(true)
 }

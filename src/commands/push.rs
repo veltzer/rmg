@@ -10,6 +10,6 @@ pub fn do_push(project: &Path) -> Result<bool> {
     if !is_ahead(project)? {
         return Ok(false);
     }
-    check_call("git", &["push"])?;
+    check_call(project, "git", &["push"])?;
     Ok(true)
 }

@@ -1,15 +1,24 @@
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::Result;
 
+use crate::subprocess_utils::capture_output_allow_failure;
+
 /// Show a git config value. Returns None if the key is not set.
-pub fn do_config(_project: &Path, key: &str) -> Result<Option<String>> {
-    let output = Command::new("git").args(["config", key]).output()?;
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if stdout.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(stdout))
+/// `git config <key>` exits 1 when the key is missing, which is not an error here.
+pub fn do_config(project: &Path, key: &str) -> Result<Option<String>> {
+    let (code, stdout, stderr) =
+        capture_output_allow_failure(project, "git", &["config", key])?;
+    match code {
+        0 => {
+            let trimmed = stdout.trim().to_string();
+            if trimmed.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(trimmed))
+            }
+        }
+        1 => Ok(None),
+        _ => anyhow::bail!("git config {key} failed (exit {code}): {stderr}"),
     }
 }
