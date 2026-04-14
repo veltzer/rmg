@@ -1,0 +1,301 @@
+use std::collections::BTreeMap;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
+
+#[derive(Debug, Deserialize)]
+pub struct CheckConfig {
+    #[serde(default)]
+    pub check: Vec<Rule>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Rule {
+    pub name: String,
+    pub select: String,
+    #[serde(default)]
+    pub exclude: Option<String>,
+    #[serde(default)]
+    pub marker: Option<String>,
+    pub path: String,
+}
+
+/// Outcome of evaluating a single rule.
+pub struct RuleResult {
+    pub name: String,
+    /// Files grouped by SHA-256 digest, ordered by group size descending
+    /// (largest group first — the presumed "canonical" version).
+    pub groups: Vec<Vec<PathBuf>>,
+    /// Total number of files considered.
+    pub total_files: usize,
+    /// Repos that matched selection but lacked `path` (skipped, not flagged).
+    pub skipped: Vec<PathBuf>,
+}
+
+impl RuleResult {
+    pub fn is_consistent(&self) -> bool {
+        self.groups.len() <= 1
+    }
+}
+
+/// Parse a config file from disk.
+pub fn load_config(path: &Path) -> Result<CheckConfig> {
+    let text = std::fs::read_to_string(path)
+        .with_context(|| format!("failed to read config file {}", path.display()))?;
+    let config: CheckConfig = toml::from_str(&text)
+        .with_context(|| format!("failed to parse config file {}", path.display()))?;
+    Ok(config)
+}
+
+fn match_glob(pattern: &str, name: &str) -> Result<bool> {
+    glob::Pattern::new(pattern)
+        .map(|p| p.matches(name))
+        .with_context(|| format!("invalid glob pattern: {pattern}"))
+}
+
+/// Apply `select`, `exclude`, and `marker` filters to the discovered repo list.
+/// `repos` are absolute or relative paths to repo roots.
+fn select_repos(rule: &Rule, repos: &[PathBuf]) -> Result<Vec<PathBuf>> {
+    let mut out = Vec::new();
+    for repo in repos {
+        let name = match repo.file_name() {
+            Some(n) => n.to_string_lossy().into_owned(),
+            None => continue,
+        };
+        if !match_glob(&rule.select, &name)? {
+            continue;
+        }
+        if let Some(ex) = &rule.exclude
+            && match_glob(ex, &name)?
+        {
+            continue;
+        }
+        if let Some(marker) = &rule.marker
+            && !repo.join(marker).exists()
+        {
+            continue;
+        }
+        out.push(repo.clone());
+    }
+    Ok(out)
+}
+
+fn hash_file(path: &Path) -> Result<[u8; 32]> {
+    let file = File::open(path).with_context(|| format!("failed to open {}", path.display()))?;
+    let mut reader = BufReader::with_capacity(64 * 1024, file);
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = reader
+            .read(&mut buf)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    Ok(hasher.finalize().into())
+}
+
+/// Evaluate a single rule against the set of discovered repos.
+pub fn evaluate_rule(rule: &Rule, repos: &[PathBuf]) -> Result<RuleResult> {
+    let candidates = select_repos(rule, repos)?;
+
+    let mut files: Vec<PathBuf> = Vec::new();
+    let mut skipped: Vec<PathBuf> = Vec::new();
+    for repo in candidates {
+        let target = repo.join(&rule.path);
+        if target.is_file() {
+            files.push(target);
+        } else {
+            skipped.push(repo);
+        }
+    }
+
+    let mut buckets: BTreeMap<[u8; 32], Vec<PathBuf>> = BTreeMap::new();
+    for file in &files {
+        let digest = hash_file(file)?;
+        buckets.entry(digest).or_default().push(file.clone());
+    }
+
+    let mut groups: Vec<Vec<PathBuf>> = buckets.into_values().collect();
+    groups.sort_by_key(|g| std::cmp::Reverse(g.len()));
+
+    Ok(RuleResult {
+        name: rule.name.clone(),
+        groups,
+        total_files: files.len(),
+        skipped,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    fn write(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, content).unwrap();
+    }
+
+    #[test]
+    fn config_parses() {
+        let toml = r#"
+            [[check]]
+            name = "gi"
+            select = "*"
+            path = ".gitignore"
+
+            [[check]]
+            name = "py-make"
+            select = "py*"
+            exclude = "pydraft*"
+            marker = ".veltzer.tag"
+            path = "Makefile"
+        "#;
+        let config: CheckConfig = toml::from_str(toml).unwrap();
+        assert_eq!(config.check.len(), 2);
+        assert_eq!(config.check[0].name, "gi");
+        assert_eq!(config.check[1].exclude.as_deref(), Some("pydraft*"));
+        assert_eq!(config.check[1].marker.as_deref(), Some(".veltzer.tag"));
+    }
+
+    #[test]
+    fn empty_config_has_no_checks() {
+        let config: CheckConfig = toml::from_str("").unwrap();
+        assert!(config.check.is_empty());
+    }
+
+    #[test]
+    fn identical_files_form_one_group() {
+        let tmp = TempDir::new().unwrap();
+        for r in ["a", "b", "c"] {
+            write(&tmp.path().join(r).join(".gitignore"), "target\n");
+        }
+        let repos: Vec<PathBuf> = ["a", "b", "c"].iter().map(|r| tmp.path().join(r)).collect();
+        let rule = Rule {
+            name: "gi".into(),
+            select: "*".into(),
+            exclude: None,
+            marker: None,
+            path: ".gitignore".into(),
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(result.is_consistent());
+        assert_eq!(result.groups.len(), 1);
+        assert_eq!(result.total_files, 3);
+    }
+
+    #[test]
+    fn divergent_files_form_multiple_groups() {
+        let tmp = TempDir::new().unwrap();
+        write(&tmp.path().join("a/.gitignore"), "x\n");
+        write(&tmp.path().join("b/.gitignore"), "x\n");
+        write(&tmp.path().join("c/.gitignore"), "y\n");
+        let repos: Vec<PathBuf> = ["a", "b", "c"].iter().map(|r| tmp.path().join(r)).collect();
+        let rule = Rule {
+            name: "gi".into(),
+            select: "*".into(),
+            exclude: None,
+            marker: None,
+            path: ".gitignore".into(),
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(!result.is_consistent());
+        assert_eq!(result.groups.len(), 2);
+        // Largest group (2 files) first.
+        assert_eq!(result.groups[0].len(), 2);
+        assert_eq!(result.groups[1].len(), 1);
+    }
+
+    #[test]
+    fn missing_files_are_skipped_not_flagged() {
+        let tmp = TempDir::new().unwrap();
+        write(&tmp.path().join("a/.gitignore"), "x\n");
+        write(&tmp.path().join("b/.gitignore"), "x\n");
+        fs::create_dir_all(tmp.path().join("c")).unwrap();
+        let repos: Vec<PathBuf> = ["a", "b", "c"].iter().map(|r| tmp.path().join(r)).collect();
+        let rule = Rule {
+            name: "gi".into(),
+            select: "*".into(),
+            exclude: None,
+            marker: None,
+            path: ".gitignore".into(),
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(result.is_consistent());
+        assert_eq!(result.total_files, 2);
+        assert_eq!(result.skipped.len(), 1);
+    }
+
+    #[test]
+    fn select_filters_by_repo_name_glob() {
+        let tmp = TempDir::new().unwrap();
+        write(&tmp.path().join("pyalpha/Makefile"), "PY\n");
+        write(&tmp.path().join("pybeta/Makefile"), "PY\n");
+        write(&tmp.path().join("go-proj/Makefile"), "GO\n");
+        let repos: Vec<PathBuf> = ["pyalpha", "pybeta", "go-proj"]
+            .iter()
+            .map(|r| tmp.path().join(r))
+            .collect();
+        let rule = Rule {
+            name: "py-make".into(),
+            select: "py*".into(),
+            exclude: None,
+            marker: None,
+            path: "Makefile".into(),
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(result.is_consistent());
+        assert_eq!(result.total_files, 2);
+    }
+
+    #[test]
+    fn exclude_drops_matching_repos() {
+        let tmp = TempDir::new().unwrap();
+        write(&tmp.path().join("pyalpha/Makefile"), "A\n");
+        write(&tmp.path().join("pybeta/Makefile"), "A\n");
+        write(&tmp.path().join("pydraft/Makefile"), "B\n");
+        let repos: Vec<PathBuf> = ["pyalpha", "pybeta", "pydraft"]
+            .iter()
+            .map(|r| tmp.path().join(r))
+            .collect();
+        let rule = Rule {
+            name: "py-make".into(),
+            select: "py*".into(),
+            exclude: Some("pydraft*".into()),
+            marker: None,
+            path: "Makefile".into(),
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(result.is_consistent());
+        assert_eq!(result.total_files, 2);
+    }
+
+    #[test]
+    fn marker_filters_by_presence() {
+        let tmp = TempDir::new().unwrap();
+        write(&tmp.path().join("a/.tag"), "");
+        write(&tmp.path().join("a/.gitignore"), "x\n");
+        write(&tmp.path().join("b/.gitignore"), "y\n");
+        let repos: Vec<PathBuf> = ["a", "b"].iter().map(|r| tmp.path().join(r)).collect();
+        let rule = Rule {
+            name: "gi".into(),
+            select: "*".into(),
+            exclude: None,
+            marker: Some(".tag".into()),
+            path: ".gitignore".into(),
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(result.is_consistent());
+        assert_eq!(result.total_files, 1);
+    }
+}
