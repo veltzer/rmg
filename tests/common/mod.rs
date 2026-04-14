@@ -7,12 +7,18 @@ use tempfile::TempDir;
 
 /// Run the rsmultigit binary with the given arguments, using `dir` as the working directory.
 pub fn run_rsmultigit(dir: &Path, args: &[&str]) -> Output {
+    run_rsmultigit_with_env(dir, args, &[])
+}
+
+/// Run the rsmultigit binary with extra env vars layered on top of the parent env.
+pub fn run_rsmultigit_with_env(dir: &Path, args: &[&str], env: &[(&str, &str)]) -> Output {
     let bin_path = env!("CARGO_BIN_EXE_rsmultigit");
-    Command::new(bin_path)
-        .current_dir(dir)
-        .args(args)
-        .output()
-        .expect("Failed to execute rsmultigit")
+    let mut cmd = Command::new(bin_path);
+    cmd.current_dir(dir).args(args);
+    for (k, v) in env {
+        cmd.env(k, v);
+    }
+    cmd.output().expect("Failed to execute rsmultigit")
 }
 
 /// Get stdout from an Output as a trimmed String.

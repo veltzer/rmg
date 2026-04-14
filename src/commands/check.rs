@@ -9,6 +9,10 @@ use sha2::{Digest, Sha256};
 
 #[derive(Debug, Deserialize)]
 pub struct CheckConfig {
+    /// Glob patterns (with shell expansion) identifying repo roots.
+    /// Non-git directories matching the pattern are filtered out.
+    #[serde(default)]
+    pub repos: Vec<String>,
     #[serde(default)]
     pub check: Vec<Rule>,
 }
@@ -48,6 +52,19 @@ impl RuleResult {
     }
 }
 
+/// Environment variable used to override the config path (tests set this).
+pub const CONFIG_PATH_ENV: &str = "RSMULTIGIT_CHECK_CONFIG";
+
+/// Resolve the path of the config file. Tests can override via `RSMULTIGIT_CHECK_CONFIG`.
+pub fn default_config_path() -> Result<PathBuf> {
+    if let Ok(p) = std::env::var(CONFIG_PATH_ENV) {
+        return Ok(PathBuf::from(p));
+    }
+    let expanded = shellexpand::full("~/.config/rsmultigit/check.toml")
+        .context("failed to expand default config path")?;
+    Ok(PathBuf::from(expanded.into_owned()))
+}
+
 /// Parse a config file from disk.
 pub fn load_config(path: &Path) -> Result<CheckConfig> {
     let text = std::fs::read_to_string(path)
@@ -55,6 +72,36 @@ pub fn load_config(path: &Path) -> Result<CheckConfig> {
     let config: CheckConfig = toml::from_str(&text)
         .with_context(|| format!("failed to parse config file {}", path.display()))?;
     Ok(config)
+}
+
+/// Expand globs in `config.repos`, filter to directories containing `.git/`,
+/// dedupe, and sort. Returns an error if `repos` is empty or no matches exist.
+pub fn resolve_repos(config: &CheckConfig) -> Result<Vec<PathBuf>> {
+    if config.repos.is_empty() {
+        anyhow::bail!("config must set `repos = [...]` with at least one entry");
+    }
+
+    let mut out: Vec<PathBuf> = Vec::new();
+    for entry in &config.repos {
+        let expanded = shellexpand::full(entry)
+            .with_context(|| format!("failed to expand `{entry}` in repos"))?;
+        let matches = glob::glob(&expanded)
+            .with_context(|| format!("invalid glob pattern `{entry}`"))?;
+        for m in matches {
+            let path = m.with_context(|| format!("error iterating glob `{entry}`"))?;
+            if path.is_dir() && path.join(".git").is_dir() {
+                out.push(path);
+            }
+        }
+    }
+
+    out.sort();
+    out.dedup();
+
+    if out.is_empty() {
+        anyhow::bail!("no git repositories matched `repos` patterns");
+    }
+    Ok(out)
 }
 
 fn match_glob(pattern: &str, name: &str) -> Result<bool> {
@@ -190,6 +237,58 @@ mod tests {
         "#;
         let config: CheckConfig = toml::from_str(toml).unwrap();
         assert!(config.check[0].enabled);
+    }
+
+    #[test]
+    fn resolve_repos_requires_non_empty() {
+        let cfg = CheckConfig {
+            repos: vec![],
+            check: vec![],
+        };
+        assert!(resolve_repos(&cfg).is_err());
+    }
+
+    #[test]
+    fn resolve_repos_filters_to_git_dirs() {
+        let tmp = TempDir::new().unwrap();
+        // Two git repos, one plain dir.
+        fs::create_dir_all(tmp.path().join("a/.git")).unwrap();
+        fs::create_dir_all(tmp.path().join("b/.git")).unwrap();
+        fs::create_dir_all(tmp.path().join("c")).unwrap();
+
+        let cfg = CheckConfig {
+            repos: vec![format!("{}/*", tmp.path().display())],
+            check: vec![],
+        };
+        let repos = resolve_repos(&cfg).unwrap();
+        assert_eq!(repos.len(), 2);
+        assert!(repos.iter().all(|p| p.join(".git").is_dir()));
+    }
+
+    #[test]
+    fn resolve_repos_dedupes() {
+        let tmp = TempDir::new().unwrap();
+        fs::create_dir_all(tmp.path().join("a/.git")).unwrap();
+
+        let cfg = CheckConfig {
+            repos: vec![
+                format!("{}/a", tmp.path().display()),
+                format!("{}/*", tmp.path().display()),
+            ],
+            check: vec![],
+        };
+        let repos = resolve_repos(&cfg).unwrap();
+        assert_eq!(repos.len(), 1);
+    }
+
+    #[test]
+    fn resolve_repos_no_matches_errors() {
+        let tmp = TempDir::new().unwrap();
+        let cfg = CheckConfig {
+            repos: vec![format!("{}/nonexistent*", tmp.path().display())],
+            check: vec![],
+        };
+        assert!(resolve_repos(&cfg).is_err());
     }
 
     #[test]
