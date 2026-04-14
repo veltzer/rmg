@@ -301,7 +301,93 @@ pub enum BuildWhat {
 pub fn print_completions(shell: Shell) {
     let mut cmd = Cli::command();
     generate(shell, &mut cmd, "rsmultigit", &mut io::stdout());
+
+    // Append a dynamic extension that completes `check-same --checks <names>`
+    // against `rsmultigit list-checks`, which reads the user's config file.
+    // clap_complete only knows about static ValueEnum choices, so --checks
+    // (free-form names from the config) needs runtime help.
+    match shell {
+        Shell::Bash => print!("{}", CHECKS_COMPLETION_BASH),
+        Shell::Zsh => print!("{}", CHECKS_COMPLETION_ZSH),
+        _ => {}
+    }
 }
+
+/// Bash snippet appended to `rsmultigit complete bash`. Wraps clap's generated
+/// `_rsmultigit` function so that tabbing after `check-same --checks` completes
+/// check names returned by `rsmultigit list-checks`.
+const CHECKS_COMPLETION_BASH: &str = r#"
+# rsmultigit: dynamic --checks completion (appended by `rsmultigit complete bash`)
+if declare -F _rsmultigit >/dev/null; then
+    eval "$(declare -f _rsmultigit | sed '1 s/^_rsmultigit /_rsmultigit_clap /')"
+
+    _rsmultigit() {
+        local i cur prev
+        cur="${COMP_WORDS[COMP_CWORD]}"
+        prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+        local in_checks=0
+        local saw_check_same=0
+        for ((i=1; i<COMP_CWORD; i++)); do
+            local w="${COMP_WORDS[i]}"
+            case "$w" in
+                check-same) saw_check_same=1 ;;
+                --checks)   in_checks=1 ;;
+                --*)        in_checks=0 ;;
+            esac
+        done
+        if [[ "$prev" == "--checks" ]]; then
+            in_checks=1
+        fi
+
+        if (( saw_check_same && in_checks )); then
+            local names
+            names=$(rsmultigit list-checks 2>/dev/null)
+            if [[ -n "$names" ]]; then
+                # shellcheck disable=SC2207
+                COMPREPLY=($(compgen -W "$names" -- "$cur"))
+                return 0
+            fi
+        fi
+        _rsmultigit_clap
+    }
+fi
+"#;
+
+/// Zsh equivalent of the bash snippet above.
+const CHECKS_COMPLETION_ZSH: &str = r#"
+# rsmultigit: dynamic --checks completion (appended by `rsmultigit complete zsh`)
+if (( ${+functions[_rsmultigit]} )); then
+    functions[_rsmultigit_clap]="${functions[_rsmultigit]}"
+
+    _rsmultigit() {
+        local prev=${words[$CURRENT-1]}
+        local seen_checks=0
+        local seen_check_same=0
+        local i
+        for ((i=1; i<CURRENT; i++)); do
+            case "${words[i]}" in
+                check-same) seen_check_same=1 ;;
+                --checks)   seen_checks=1 ;;
+                --*)        seen_checks=0 ;;
+            esac
+        done
+        if [[ "$prev" == "--checks" ]]; then
+            seen_checks=1
+        fi
+
+        if (( seen_check_same && seen_checks )); then
+            local -a names
+            names=(${(f)"$(rsmultigit list-checks 2>/dev/null)"})
+            if (( ${#names} )); then
+                _describe 'check name' names
+                return 0
+            fi
+        fi
+        _rsmultigit_clap "$@"
+    }
+fi
+"#;
 
 #[cfg(test)]
 mod tests {
