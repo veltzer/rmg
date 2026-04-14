@@ -39,8 +39,22 @@ fn main() -> Result<()> {
     let file_config = commands::check::load_config(&config_path)?;
     let projects = commands::check::resolve_repos(&file_config)?;
 
-    if let Commands::CheckSame { checks, diff, copy } = &cli.command {
-        let exit_code = run_check_same(&config, &file_config, &projects, checks, *diff, *copy)?;
+    if let Commands::CheckSame {
+        checks,
+        diff,
+        copy,
+        fix_missing,
+    } = &cli.command
+    {
+        let exit_code = run_check_same(
+            &config,
+            &file_config,
+            &projects,
+            checks,
+            *diff,
+            *copy,
+            *fix_missing,
+        )?;
         std::process::exit(exit_code);
     }
 
@@ -244,6 +258,7 @@ fn run_check_same(
     requested: &[String],
     show_diff: bool,
     do_copy: bool,
+    do_fix_missing: bool,
 ) -> Result<i32> {
     use commands::check;
     use commands::interactive;
@@ -308,15 +323,22 @@ fn run_check_same(
         if !app.no_header {
             println!("[{}]", result.name);
         }
+        let mut suffix_parts: Vec<String> = Vec::new();
+        if !result.must_have_violations.is_empty() {
+            suffix_parts.push(format!("{} missing", result.must_have_violations.len()));
+        }
+        if !result.skipped.is_empty() {
+            suffix_parts.push(format!("{} skipped", result.skipped.len()));
+        }
+        let suffix = if suffix_parts.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", suffix_parts.join(", "))
+        };
         println!(
-            "{} files, {} groups{}",
+            "{} files, {} groups{suffix}",
             result.total_files,
             result.groups.len(),
-            if result.skipped.is_empty() {
-                String::new()
-            } else {
-                format!(" ({} skipped)", result.skipped.len())
-            },
         );
         if !app.no_output {
             for (i, group) in result.groups.iter().enumerate() {
@@ -324,6 +346,13 @@ fn run_check_same(
                 println!("  group {label} ({} files):", group.len());
                 for file in group {
                     println!("    {}", file.display());
+                }
+            }
+
+            if !result.must_have_violations.is_empty() {
+                println!("  missing in:");
+                for repo in &result.must_have_violations {
+                    println!("    {}", repo.display());
                 }
             }
 
@@ -346,10 +375,20 @@ fn run_check_same(
                     FlowControl::Continue => {}
                 }
             }
+
+            if do_fix_missing && !result.must_have_violations.is_empty() {
+                match run_fix_missing(&result, &mut stdin.lock(), &mut stdout.lock())? {
+                    FlowControl::Quit => {
+                        quit_requested = true;
+                        continue;
+                    }
+                    FlowControl::Continue => {}
+                }
+            }
         }
     }
 
-    if do_copy {
+    if do_copy || do_fix_missing {
         Ok(0)
     } else {
         Ok(if any_mismatch { 1 } else { 0 })
@@ -508,4 +547,76 @@ fn copy_preserving_mode(src: &std::path::Path, dst: &std::path::Path) -> Result<
     std::fs::set_permissions(dst, original_mode)
         .with_context(|| format!("failed to restore permissions on {}", dst.display()))?;
     Ok(())
+}
+
+/// Run the interactive fix-missing flow for a rule that has `must_have`
+/// violations. Prompts for a "seed" group to copy from, then creates the file
+/// in each violating repo, using plain `fs::copy` (so the new file inherits the
+/// source's mode). Parent directories are created as needed.
+///
+/// When the rule has zero content groups (no repo has the file at all) there's
+/// nothing to seed from — print a note and skip.
+fn run_fix_missing<R: std::io::BufRead, W: std::io::Write>(
+    result: &commands::check::RuleResult,
+    reader: &mut R,
+    writer: &mut W,
+) -> Result<FlowControl> {
+    use commands::interactive::{Choice, confirm, pick_group};
+
+    if result.groups.is_empty() {
+        let _ = writeln!(
+            writer,
+            "  (cannot --fix-missing: no repo has {} — nothing to seed from)",
+            result.path
+        );
+        return Ok(FlowControl::Continue);
+    }
+
+    let n = result.groups.len();
+    let from = match pick_group(
+        &mut *reader,
+        &mut *writer,
+        "seed missing files from which group?",
+        n,
+        None,
+    )? {
+        Choice::Value(i) => i,
+        Choice::Skip => return Ok(FlowControl::Continue),
+        Choice::Quit => return Ok(FlowControl::Quit),
+    };
+
+    let src = &result.groups[from][0];
+    let violators = &result.must_have_violations;
+    let prompt = format!(
+        "create {} file(s) using content from {}?",
+        violators.len(),
+        src.display()
+    );
+    if !confirm(&mut *reader, &mut *writer, &prompt)? {
+        let _ = writeln!(writer, "  (skipped)");
+        return Ok(FlowControl::Continue);
+    }
+
+    for repo in violators {
+        let dst = repo.join(&result.path);
+        if let Some(parent) = dst.parent()
+            && let Err(e) = std::fs::create_dir_all(parent)
+        {
+            let _ = writeln!(
+                writer,
+                "  error: failed to create directory {}: {e}",
+                parent.display()
+            );
+            continue;
+        }
+        match std::fs::copy(src, &dst) {
+            Ok(_) => {
+                let _ = writeln!(writer, "  created -> {}", dst.display());
+            }
+            Err(e) => {
+                let _ = writeln!(writer, "  error: {} -> {}: {e}", src.display(), dst.display());
+            }
+        }
+    }
+    Ok(FlowControl::Continue)
 }

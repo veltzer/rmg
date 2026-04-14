@@ -9,15 +9,21 @@
 # that a given path has identical content across a selection of repos.
 #
 # Selection primitives (per check rule):
-#   select  — glob over repo names (required)
-#   exclude — glob of repo names to drop from the selection
-#   marker  — only include repos that contain this file (relative to repo root)
-#   path    — file inside each repo to compare (required)
-#   enabled — bool (default true). Disabled rules are silently skipped, but can
-#             still be forced on with `--checks <name...>` for ad-hoc checks.
+#   select     — glob over repo names (required)
+#   exclude    — glob of repo names to drop from the selection
+#   marker     — only include repos that contain this file (relative to repo root)
+#   path       — file inside each repo to compare (required)
+#   enabled    — bool (default true). Disabled rules are silently skipped, but can
+#                still be forced on with `--checks <name...>` for ad-hoc checks.
+#   must_have  — bool (default false). When true, every in-scope repo must contain
+#                `path`; missing files become rule violations (reported as "missing in:"
+#                and counted as mismatches). `check-same --fix-missing` will walk
+#                those violators interactively and create the file from a chosen
+#                seed group.
 #
-# A rule passes when every surviving repo's `path` hashes the same.
-# Repos that don't contain `path` are silently skipped.
+# A rule passes when every surviving repo's `path` hashes the same, *and*
+# (when must_have = true) every in-scope repo contains the file.
+# Repos that don't contain `path` are silently skipped when must_have = false.
 
 repos = [
     "~/git/veltzer/*",

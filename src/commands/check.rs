@@ -28,6 +28,11 @@ pub struct Rule {
     pub path: String,
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+    /// When true, every in-scope repo must contain `path`. Missing files become
+    /// rule violations (reported as "missing in: ..." and counted as mismatches).
+    /// When false (default), missing files are silently skipped.
+    #[serde(default)]
+    pub must_have: bool,
 }
 
 fn default_enabled() -> bool {
@@ -37,18 +42,24 @@ fn default_enabled() -> bool {
 /// Outcome of evaluating a single rule.
 pub struct RuleResult {
     pub name: String,
+    /// The file inside each repo that was hashed (the rule's `path`).
+    pub path: String,
     /// Files grouped by SHA-256 digest, ordered by group size descending
     /// (largest group first — the presumed "canonical" version).
     pub groups: Vec<Vec<PathBuf>>,
     /// Total number of files considered.
     pub total_files: usize,
-    /// Repos that matched selection but lacked `path` (skipped, not flagged).
+    /// Repos that matched selection but lacked `path`. When the rule has
+    /// `must_have = false`, they're treated as "skipped" (not a violation).
     pub skipped: Vec<PathBuf>,
+    /// Repos that matched selection but lacked `path` *and* the rule has
+    /// `must_have = true`. These are rule violations.
+    pub must_have_violations: Vec<PathBuf>,
 }
 
 impl RuleResult {
     pub fn is_consistent(&self) -> bool {
-        self.groups.len() <= 1
+        self.groups.len() <= 1 && self.must_have_violations.is_empty()
     }
 }
 
@@ -159,13 +170,13 @@ pub fn evaluate_rule(rule: &Rule, repos: &[PathBuf]) -> Result<RuleResult> {
     let candidates = select_repos(rule, repos)?;
 
     let mut files: Vec<PathBuf> = Vec::new();
-    let mut skipped: Vec<PathBuf> = Vec::new();
+    let mut missing: Vec<PathBuf> = Vec::new();
     for repo in candidates {
         let target = repo.join(&rule.path);
         if target.is_file() {
             files.push(target);
         } else {
-            skipped.push(repo);
+            missing.push(repo);
         }
     }
 
@@ -178,11 +189,19 @@ pub fn evaluate_rule(rule: &Rule, repos: &[PathBuf]) -> Result<RuleResult> {
     let mut groups: Vec<Vec<PathBuf>> = buckets.into_values().collect();
     groups.sort_by_key(|g| std::cmp::Reverse(g.len()));
 
+    let (skipped, must_have_violations) = if rule.must_have {
+        (Vec::new(), missing)
+    } else {
+        (missing, Vec::new())
+    };
+
     Ok(RuleResult {
         name: rule.name.clone(),
+        path: rule.path.clone(),
         groups,
         total_files: files.len(),
         skipped,
+        must_have_violations,
     })
 }
 
@@ -318,6 +337,7 @@ mod tests {
             marker: None,
             path: ".gitignore".into(),
             enabled: true,
+            must_have: false,
         };
         let result = evaluate_rule(&rule, &repos).unwrap();
         assert!(result.is_consistent());
@@ -339,6 +359,7 @@ mod tests {
             marker: None,
             path: ".gitignore".into(),
             enabled: true,
+            must_have: false,
         };
         let result = evaluate_rule(&rule, &repos).unwrap();
         assert!(!result.is_consistent());
@@ -362,6 +383,7 @@ mod tests {
             marker: None,
             path: ".gitignore".into(),
             enabled: true,
+            must_have: false,
         };
         let result = evaluate_rule(&rule, &repos).unwrap();
         assert!(result.is_consistent());
@@ -386,6 +408,7 @@ mod tests {
             marker: None,
             path: "Makefile".into(),
             enabled: true,
+            must_have: false,
         };
         let result = evaluate_rule(&rule, &repos).unwrap();
         assert!(result.is_consistent());
@@ -409,10 +432,89 @@ mod tests {
             marker: None,
             path: "Makefile".into(),
             enabled: true,
+            must_have: false,
         };
         let result = evaluate_rule(&rule, &repos).unwrap();
         assert!(result.is_consistent());
         assert_eq!(result.total_files, 2);
+    }
+
+    #[test]
+    fn must_have_defaults_to_false() {
+        let toml = r#"
+            [[check]]
+            name = "a"
+            select = "*"
+            path = "x"
+        "#;
+        let config: CheckConfig = toml::from_str(toml).unwrap();
+        assert!(!config.check[0].must_have);
+    }
+
+    #[test]
+    fn must_have_false_keeps_missing_in_skipped() {
+        let tmp = TempDir::new().unwrap();
+        write(&tmp.path().join("a/.gitignore"), "x\n");
+        write(&tmp.path().join("b/.gitignore"), "x\n");
+        fs::create_dir_all(tmp.path().join("c")).unwrap();
+        let repos: Vec<PathBuf> = ["a", "b", "c"].iter().map(|r| tmp.path().join(r)).collect();
+        let rule = Rule {
+            name: "gi".into(),
+            select: "*".into(),
+            exclude: None,
+            marker: None,
+            path: ".gitignore".into(),
+            enabled: true,
+            must_have: false,
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(result.is_consistent());
+        assert_eq!(result.skipped.len(), 1);
+        assert!(result.must_have_violations.is_empty());
+    }
+
+    #[test]
+    fn must_have_true_moves_missing_to_violations() {
+        let tmp = TempDir::new().unwrap();
+        write(&tmp.path().join("a/.gitignore"), "x\n");
+        write(&tmp.path().join("b/.gitignore"), "x\n");
+        fs::create_dir_all(tmp.path().join("c")).unwrap();
+        let repos: Vec<PathBuf> = ["a", "b", "c"].iter().map(|r| tmp.path().join(r)).collect();
+        let rule = Rule {
+            name: "gi".into(),
+            select: "*".into(),
+            exclude: None,
+            marker: None,
+            path: ".gitignore".into(),
+            enabled: true,
+            must_have: true,
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(!result.is_consistent());
+        assert!(result.skipped.is_empty());
+        assert_eq!(result.must_have_violations.len(), 1);
+        assert!(result.must_have_violations[0].ends_with("c"));
+    }
+
+    #[test]
+    fn must_have_true_all_present_is_consistent() {
+        let tmp = TempDir::new().unwrap();
+        for r in ["a", "b", "c"] {
+            write(&tmp.path().join(r).join(".gitignore"), "same\n");
+        }
+        let repos: Vec<PathBuf> = ["a", "b", "c"].iter().map(|r| tmp.path().join(r)).collect();
+        let rule = Rule {
+            name: "gi".into(),
+            select: "*".into(),
+            exclude: None,
+            marker: None,
+            path: ".gitignore".into(),
+            enabled: true,
+            must_have: true,
+        };
+        let result = evaluate_rule(&rule, &repos).unwrap();
+        assert!(result.is_consistent());
+        assert!(result.must_have_violations.is_empty());
     }
 
     #[test]
@@ -429,6 +531,7 @@ mod tests {
             marker: Some(".tag".into()),
             path: ".gitignore".into(),
             enabled: true,
+            must_have: false,
         };
         let result = evaluate_rule(&rule, &repos).unwrap();
         assert!(result.is_consistent());

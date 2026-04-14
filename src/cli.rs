@@ -104,6 +104,12 @@ pub enum Commands {
         /// Always exits 0 on success, regardless of whether mismatches remain.
         #[arg(long, default_value_t = false)]
         copy: bool,
+        /// Interactively create missing files in repos that violate a rule's
+        /// `must_have = true` requirement. Prompts for which content group to
+        /// seed from, then writes the file (creating parent directories as needed).
+        /// Always exits 0 on success.
+        #[arg(long, default_value_t = false)]
+        fix_missing: bool,
     },
     /// Clean repositories
     Clean {

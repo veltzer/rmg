@@ -795,3 +795,196 @@ path = ".gitignore"
         "from-a\n"
     );
 }
+
+// ── must_have + --fix-missing ───────────────────────────────────────────────
+
+#[test]
+fn check_same_must_have_false_ignores_missing_files() {
+    // a has the file, b doesn't. must_have defaults to false → no violation.
+    let tmp = setup_git_repos(&["a", "b"]);
+    fs::write(tmp.path().join("a/.gitignore"), "x\n").unwrap();
+    let cfg = write_config(
+        tmp.path(),
+        r#"
+[[check]]
+name = "gi"
+select = "*"
+path = ".gitignore"
+"#,
+    );
+
+    let output = run(tmp.path(), &cfg, &["check-same"]);
+    assert!(output.status.success(), "stdout: {}\nstderr: {}", stdout_str(&output), stderr_str(&output));
+}
+
+#[test]
+fn check_same_must_have_true_flags_missing_files() {
+    let tmp = setup_git_repos(&["a", "b"]);
+    fs::write(tmp.path().join("a/.gitignore"), "x\n").unwrap();
+    let cfg = write_config(
+        tmp.path(),
+        r#"
+[[check]]
+name = "gi"
+select = "*"
+path = ".gitignore"
+must_have = true
+"#,
+    );
+
+    let output = run(tmp.path(), &cfg, &["check-same"]);
+    assert!(!output.status.success(), "must_have violation should exit 1");
+    let stdout = stdout_str(&output);
+    assert!(stdout.contains("1 missing"), "summary should mention missing count: {stdout}");
+    assert!(stdout.contains("missing in:"), "should emit missing-in block: {stdout}");
+    assert!(
+        stdout.contains(tmp.path().join("b").to_string_lossy().as_ref()),
+        "should list the violating repo: {stdout}"
+    );
+}
+
+#[test]
+fn check_same_fix_missing_creates_files() {
+    // a has the file ("canonical"), b and c don't. With must_have=true and
+    // --fix-missing, we seed from group A.
+    let tmp = setup_git_repos(&["a", "b", "c"]);
+    fs::write(tmp.path().join("a/.gitignore"), "canonical\n").unwrap();
+    let cfg = write_config(
+        tmp.path(),
+        r#"
+[[check]]
+name = "gi"
+select = "*"
+path = ".gitignore"
+must_have = true
+"#,
+    );
+
+    // Only one content group (A), pick it, confirm.
+    let output = run_with_stdin(
+        tmp.path(),
+        &cfg,
+        &["check-same", "--fix-missing"],
+        b"A\ny\n",
+    );
+    assert!(
+        output.status.success(),
+        "--fix-missing always exits 0: stderr={}",
+        stderr_str(&output)
+    );
+    assert_eq!(
+        fs::read_to_string(tmp.path().join("b/.gitignore")).unwrap(),
+        "canonical\n"
+    );
+    assert_eq!(
+        fs::read_to_string(tmp.path().join("c/.gitignore")).unwrap(),
+        "canonical\n"
+    );
+    // a unchanged.
+    assert_eq!(
+        fs::read_to_string(tmp.path().join("a/.gitignore")).unwrap(),
+        "canonical\n"
+    );
+}
+
+#[test]
+fn check_same_fix_missing_creates_parent_directories() {
+    // Path with nested subdirectories that don't exist in the violator.
+    let tmp = setup_git_repos(&["a", "b"]);
+    let nested = tmp.path().join("a/.github/workflows/build.yml");
+    fs::create_dir_all(nested.parent().unwrap()).unwrap();
+    fs::write(&nested, "on: push\n").unwrap();
+    let cfg = write_config(
+        tmp.path(),
+        r#"
+[[check]]
+name = "wf"
+select = "*"
+path = ".github/workflows/build.yml"
+must_have = true
+"#,
+    );
+
+    let output = run_with_stdin(
+        tmp.path(),
+        &cfg,
+        &["check-same", "--fix-missing"],
+        b"A\ny\n",
+    );
+    assert!(output.status.success(), "stderr: {}", stderr_str(&output));
+    let dst = tmp.path().join("b/.github/workflows/build.yml");
+    assert!(dst.exists(), "nested file should have been created: {}", dst.display());
+    assert_eq!(fs::read_to_string(&dst).unwrap(), "on: push\n");
+}
+
+#[test]
+fn check_same_fix_missing_declined_leaves_alone() {
+    let tmp = setup_git_repos(&["a", "b"]);
+    fs::write(tmp.path().join("a/.gitignore"), "canonical\n").unwrap();
+    let cfg = write_config(
+        tmp.path(),
+        r#"
+[[check]]
+name = "gi"
+select = "*"
+path = ".gitignore"
+must_have = true
+"#,
+    );
+
+    // Pick A, then decline the confirmation.
+    let output = run_with_stdin(
+        tmp.path(),
+        &cfg,
+        &["check-same", "--fix-missing"],
+        b"A\nn\n",
+    );
+    assert!(output.status.success());
+    assert!(!tmp.path().join("b/.gitignore").exists(), "file should not have been created");
+}
+
+#[test]
+fn check_same_fix_missing_with_no_groups_skips() {
+    // Nobody has the file, so there's nothing to seed from.
+    let tmp = setup_git_repos(&["a", "b"]);
+    let cfg = write_config(
+        tmp.path(),
+        r#"
+[[check]]
+name = "gi"
+select = "*"
+path = ".gitignore"
+must_have = true
+"#,
+    );
+
+    let output = run_with_stdin(tmp.path(), &cfg, &["check-same", "--fix-missing"], b"");
+    assert!(output.status.success(), "should still exit 0");
+    let stdout = stdout_str(&output);
+    assert!(
+        stdout.contains("nothing to seed from"),
+        "should note no seed available: {stdout}"
+    );
+    // Neither file should have been created.
+    assert!(!tmp.path().join("a/.gitignore").exists());
+    assert!(!tmp.path().join("b/.gitignore").exists());
+}
+
+#[test]
+fn check_same_fix_missing_always_exits_zero() {
+    let tmp = setup_git_repos(&["a", "b"]);
+    fs::write(tmp.path().join("a/.gitignore"), "x\n").unwrap();
+    let cfg = write_config(
+        tmp.path(),
+        r#"
+[[check]]
+name = "gi"
+select = "*"
+path = ".gitignore"
+must_have = true
+"#,
+    );
+    // Quit immediately.
+    let output = run_with_stdin(tmp.path(), &cfg, &["check-same", "--fix-missing"], b"q\n");
+    assert!(output.status.success());
+}
